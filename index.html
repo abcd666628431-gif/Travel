@@ -77,6 +77,12 @@
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
 
+        /* 備註框自動延伸支援 */
+        textarea.auto-extend {
+            field-sizing: content; /* 現代瀏覽器 */
+            min-height: 1.5em;
+        }
+
         img[alt="東京地鐵路線圖"] {
             filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
         }
@@ -151,7 +157,16 @@
         const getEndTime = (timeStr, hoursToAdd = 1) => {
             if (!timeStr) return '';
             let [h, m] = timeStr.split(':').map(Number);
-            h = (h + hoursToAdd) % 24;
+            
+            // 處理小數點小時 (例如 1.5 小時 = 1小時30分)
+            const addH = Math.floor(hoursToAdd);
+            const addM = Math.round((hoursToAdd - addH) * 60);
+            
+            m += addM;
+            h += addH + Math.floor(m / 60);
+            m = m % 60;
+            h = h % 24;
+            
             return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
         };
 
@@ -167,7 +182,6 @@
             return map[type] || '其他';
         };
 
-        // --- Initial Data ---
         const INITIAL_TRIP = {
             id: 'trip-sz-macau',
             title: '深圳澳門四日遊',
@@ -180,8 +194,8 @@
                     places: [
                         { id: 'p1', time: '12:00', name: '羅湖口岸出口', type: 'transport', lat: 22.5312, lng: 114.1136, note: '集合', stayTime: '1', travelMode: 'drive' },
                         { id: 'p2', time: '13:09', name: '玩壹把电竞酒店', type: 'accommodation', lat: 22.5400, lng: 114.0500, note: 'Check-in', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p3', time: '14:30', name: '燒肉公社（梅林店）', type: 'food', lat: 22.5600, lng: 114.0400, note: '午餐', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p4', time: '15:58', name: '寶可夢 (壹方城購物中心)', type: 'shopping', lat: 22.5533, lng: 113.8870, note: '', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p3', time: '14:30', name: '燒肉公社（梅林店）', type: 'food', lat: 22.5600, lng: 114.0400, note: '午餐', stayTime: '1.5', travelMode: 'drive' },
+                        { id: 'p4', time: '15:58', name: '寶可夢 (壹方城購物中心)', type: 'shopping', lat: 22.5533, lng: 113.8870, note: '', stayTime: '2.5', travelMode: 'drive' },
                         { id: 'p5', time: '18:39', name: '(跳格子) (金光華廣場)', type: 'sight', lat: 22.5390, lng: 114.1180, note: '', stayTime: '1', travelMode: 'drive' },
                         { id: 'p6', time: '19:39', name: '按摩 (玖玖·影院足道)', type: 'sight', lat: 22.5360, lng: 114.0550, note: '福田COCO Park', stayTime: '1', travelMode: 'drive' },
                         { id: 'p7', time: '20:59', name: '野妹火锅（东门町店）', type: 'food', lat: 22.5450, lng: 114.1170, note: '晚餐', stayTime: '1', travelMode: 'drive' },
@@ -191,29 +205,29 @@
                 {
                     id: 2, date: '2026/04/04 (六)', title: '前往澳門', color: '#25c9dc', weather: { type: 'sun', minTemp: 23, maxTemp: 29, label: '晴天' },
                     places: [
-                        { id: 'p9', time: '12:00', name: '玩壹把电竞酒店', type: 'accommodation', lat: 22.5400, lng: 114.0500, note: '退房', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p10', time: '12:08', name: '羅湖口岸出口', type: 'transport', lat: 22.5312, lng: 114.1136, note: '出境', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p9', time: '12:00', name: '玩壹把电竞酒店', type: 'accommodation', lat: 22.5400, lng: 114.0500, note: '退房', stayTime: '0.5', travelMode: 'drive' },
+                        { id: 'p10', time: '12:08', name: '羅湖口岸出口', type: 'transport', lat: 22.5312, lng: 114.1136, note: '出境', stayTime: '3', travelMode: 'drive' },
                         { id: 'p11', time: '15:18', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '珠海/澳門 Check-in', stayTime: '1', travelMode: 'drive' },
                         { id: 'p12', time: '16:52', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '過關', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p13', time: '17:52', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '抵達澳門', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p13', time: '17:52', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '抵達澳門', stayTime: '1.5', travelMode: 'drive' },
                         { id: 'p14', time: '19:29', name: '旅遊塔(空中漫步)', type: 'sight', lat: 22.1790, lng: 113.5370, note: '看夜景', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p15', time: '20:33', name: '澳門科學館', type: 'sight', lat: 22.1860, lng: 113.5560, note: '', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p15', time: '20:33', name: '澳門科學館', type: 'sight', lat: 22.1860, lng: 113.5560, note: '', stayTime: '1.5', travelMode: 'drive' },
                         { id: 'p16', time: '22:22', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '回程', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p17', time: '23:22', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p17', time: '23:22', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1.5', travelMode: 'drive' },
                         { id: 'p18', time: '00:58', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '休息', stayTime: '1', travelMode: 'drive' }
                     ]
                 },
                 {
                     id: 3, date: '2026/04/05 (日)', title: '水上樂園', color: '#3fbd22', weather: { type: 'cloud', minTemp: 24, maxTemp: 30, label: '多雲' },
                     places: [
-                        { id: 'p19', time: '11:00', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p19', time: '11:00', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '', stayTime: '0.5', travelMode: 'drive' },
                         { id: 'p20', time: '11:33', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p21', time: '12:33', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p22', time: '14:23', name: '新濠影匯 (澳門飛索)', type: 'sight', lat: 22.1400, lng: 113.5610, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p23', time: '15:56', name: '新濠影滙水上樂園', type: 'sight', lat: 22.1400, lng: 113.5610, note: '玩水', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p21', time: '12:33', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '', stayTime: '1.5', travelMode: 'drive' },
+                        { id: 'p22', time: '14:23', name: '新濠影匯 (澳門飛索)', type: 'sight', lat: 22.1400, lng: 113.5610, note: '', stayTime: '1.5', travelMode: 'drive' },
+                        { id: 'p23', time: '15:56', name: '新濠影滙水上樂園', type: 'sight', lat: 22.1400, lng: 113.5610, note: '玩水', stayTime: '3', travelMode: 'drive' },
                         { id: 'p24', time: '19:14', name: '永利皇宮纜車站', type: 'sight', lat: 22.1470, lng: 113.5680, note: '看水舞', stayTime: '1', travelMode: 'drive' },
                         { id: 'p25', time: '20:19', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p26', time: '21:19', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p26', time: '21:19', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1.5', travelMode: 'drive' },
                         { id: 'p27', time: '22:56', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '', stayTime: '1', travelMode: 'drive' },
                         { id: 'p28', time: '00:06', name: '麻雀', type: 'other', lat: 22.1500, lng: 113.5500, note: '', stayTime: '1', travelMode: 'drive' },
                         { id: 'p29', time: '01:06', name: '唱K', type: 'other', lat: 22.1520, lng: 113.5520, note: '', stayTime: '1', travelMode: 'drive' }
@@ -222,16 +236,16 @@
                 {
                     id: 4, date: '2026/04/06 (一)', title: '購物與美食', color: '#af54ff', weather: { type: 'rain', minTemp: 22, maxTemp: 26, label: '有雨' },
                     places: [
-                        { id: 'p30', time: '12:00', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p30', time: '12:00', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '', stayTime: '0.5', travelMode: 'drive' },
                         { id: 'p31', time: '12:33', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p32', time: '13:33', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p34', time: '15:33', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p35', time: '17:10', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '取行李', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p36', time: '20:18', name: '羅湖口岸出口', type: 'transport', lat: 22.5312, lng: 114.1136, note: '回到深圳', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p32', time: '13:33', name: '橫琴澳方口岸', type: 'transport', lat: 22.1380, lng: 113.5460, note: '', stayTime: '2', travelMode: 'drive' },
+                        { id: 'p34', time: '15:33', name: '橫琴口岸', type: 'transport', lat: 22.1380, lng: 113.5440, note: '', stayTime: '1.5', travelMode: 'drive' },
+                        { id: 'p35', time: '17:10', name: '愛電競酒店', type: 'accommodation', lat: 22.1400, lng: 113.5300, note: '取行李', stayTime: '3', travelMode: 'drive' },
+                        { id: 'p36', time: '20:18', name: '羅湖口岸出口', type: 'transport', lat: 22.5312, lng: 114.1136, note: '回到深圳', stayTime: '3', travelMode: 'drive' },
                         { id: 'p37', time: '23:26', name: '珠海万象汇', type: 'shopping', lat: 22.2460, lng: 113.4980, note: '逛街', stayTime: '1', travelMode: 'drive' },
                         { id: 'p38', time: '00:41', name: '華發商都', type: 'shopping', lat: 22.2220, lng: 113.5040, note: '', stayTime: '1', travelMode: 'drive' },
                         { id: 'p39', time: '01:49', name: '中海環宇城濱河灣', type: 'shopping', lat: 22.2290, lng: 113.5180, note: '', stayTime: '1', travelMode: 'drive' },
-                        { id: 'p40', time: '02:53', name: '富華里', type: 'shopping', lat: 22.2350, lng: 113.5350, note: '', stayTime: '1', travelMode: 'drive' },
+                        { id: 'p40', time: '02:53', name: '富華里', type: 'shopping', lat: 22.2350, lng: 113.5350, note: '', stayTime: '2', travelMode: 'drive' },
                         { id: 'p41', time: '05:04', name: '山卡谷·日式烧肉店', type: 'food', lat: 22.2220, lng: 113.5040, note: '宵夜', stayTime: '1', travelMode: 'drive' },
                         { id: 'p42', time: '06:04', name: '官也街', type: 'sight', lat: 22.1530, lng: 113.5560, note: '伴手禮', stayTime: '1', travelMode: 'drive' },
                         { id: 'p43', time: '07:08', name: '安德魯蛋撻', type: 'food', lat: 22.1180, lng: 113.5510, note: '必吃', stayTime: '1', travelMode: 'drive' },
@@ -1073,12 +1087,12 @@
                                                     {activeDayData?.places.map((p, i) => {
                                                         const isNoteExpanded = expandedNotes[p.id];
                                                         return (
-                                                            <div key={p.id} draggable={dragEnabledId === p.id} onDragStart={e => handleDragStart(e, i)} onDragOver={e => e.preventDefault()} onDrop={e => handleDrop(e, i)} onDragEnd={handleDragEnd} className="flex flex-col group/card">
+                                                            <div key={p.id} draggable={dragEnabledId === p.id} onDragStart={e => handleDragStart(e, i)} onDragOver={e => e.preventDefault()} onDrop={e => handleDrop(e, i)} onDragEnd={handleDragEnd} className={`flex flex-col group/card transition-all duration-200 ${draggedPlaceIndex === i ? 'opacity-30 scale-[0.98]' : ''}`}>
                                                                 <div className="flex gap-3 items-stretch">
                                                                     {/* Timeline Visual */}
                                                                     <div className="flex flex-col items-center w-12 shrink-0">
                                                                         <div className="text-[12px] font-bold text-blue-300 font-mono mb-1.5 pt-1">{p.time}</div>
-                                                                        <div onMouseEnter={() => setDragEnabledId(p.id)} onMouseLeave={() => setDragEnabledId(null)} className="drag-handle w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold text-white mt-1 shadow-lg shadow-blue-900/50 border-2 border-slate-900 cursor-grab active:cursor-grabbing">
+                                                                        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold text-white mt-1 shadow-lg shadow-blue-900/50 border-2 border-slate-900">
                                                                             {i+1}
                                                                         </div>
                                                                         {i < activeDayData.places.length - 1 && <div className="w-0.5 bg-slate-700 flex-1 mt-1.5 min-h-[1.5rem]"></div>}
@@ -1088,11 +1102,18 @@
                                                                     <div className="flex-1 pb-3">
                                                                         <div className={`flex items-start gap-3 p-3 rounded-xl border border-slate-700 bg-slate-800/80 transition-all ${hoveredPlaceId === p.id ? 'border-blue-500 shadow-xl' : ''}`} onMouseEnter={() => setHoveredPlaceId(p.id)} onMouseLeave={() => setHoveredPlaceId(null)}>
                                                                             
-                                                                            <div className="w-[60px] h-[60px] bg-slate-700 rounded-lg shrink-0 flex items-center justify-center relative overflow-hidden cursor-pointer shadow-inner" onClick={() => p.image && setPreviewImage(p.image)}>
+                                                                            <div 
+                                                                                onMouseEnter={() => setDragEnabledId(p.id)} 
+                                                                                onMouseLeave={() => setDragEnabledId(null)} 
+                                                                                className="drag-handle w-[60px] h-[60px] bg-slate-700 rounded-lg shrink-0 flex items-center justify-center relative overflow-hidden cursor-grab active:cursor-grabbing shadow-inner hover:ring-2 hover:ring-blue-500 transition-all" 
+                                                                                onClick={() => p.image && setPreviewImage(p.image)}
+                                                                            >
                                                                                 {p.image ? (
-                                                                                    <img src={p.image} className="w-full h-full object-cover rounded-lg hover:scale-105 transition-transform" />
+                                                                                    <img src={p.image} draggable={false} className="w-full h-full object-cover rounded-lg hover:scale-105 transition-transform pointer-events-none" />
                                                                                 ) : (
-                                                                                    <CategoryIcon type={p.type} size={24} />
+                                                                                    <div className="pointer-events-none">
+                                                                                        <CategoryIcon type={p.type} size={24} />
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
 
@@ -1228,7 +1249,7 @@
                                                                 value={newItem.note} 
                                                                 onChange={e => setNewItem({...newItem, note: e.target.value})} 
                                                                 rows="3"
-                                                                className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 resize-none" 
+                                                                className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 resize-none auto-extend" 
                                                                 placeholder="輸入備註事項..." 
                                                             />
                                                         </div>
