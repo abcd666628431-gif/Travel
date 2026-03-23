@@ -1,26 +1,454 @@
-const RealMap = React.memo(({ places }) => {
-    const mapRef = useRef(null);
-    const mapInstanceRef = useRef(null);
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="referrer" content="no-referrer" />
+    <title>旅遊行程規劃助手 - 🚀</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    useEffect(() => {
-        if (!mapInstanceRef.current) {
-            const map = L.map(mapRef.current, { zoomControl: false }).setView([22.5, 114.1], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            mapInstanceRef.current = map;
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css">
+    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/scroll-behaviour.min.js"></script>
+
+    <script type="module">
+        import { initializeApp } from "https://gs.jurieo.com/gemini/gstatic/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://gs.jurieo.com/gemini/gstatic/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, onSnapshot, updateDoc, collection, deleteDoc } from "https://gs.jurieo.com/gemini/gstatic/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.FirebaseSDK = { 
+            initializeApp, 
+            getAuth, signInAnonymously, onAuthStateChanged, 
+            getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, 
+            doc, setDoc, onSnapshot, updateDoc, collection, deleteDoc 
+        };
+    </script>
+
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #0f172a; height: 100dvh; width: 100vw; color: #f3f4f6; }
+        #root { height: 100%; width: 100%; }
+        .leaflet-div-icon { background: transparent; border: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-toast { animation: fadeIn 0.3s ease-out forwards; }
+        .bg-white { background-color: #1f2937 !important; }
+        .bg-gray-50 { background-color: #111827 !important; }
+        .bg-gray-100 { background-color: #374151 !important; }
+        .bg-gray-200 { background-color: #4b5563 !important; }
+        .text-gray-900 { color: #f9fafb !important; }
+        .text-gray-800 { color: #f3f4f6 !important; }
+        .text-gray-700 { color: #e5e7eb !important; }
+        .text-gray-600 { color: #d1d5db !important; }
+        .text-gray-500 { color: #9ca3af !important; }
+        .text-gray-400 { color: #6b7280 !important; }
+        .border-gray-200 { border-color: #4b5563 !important; }
+        .border, .border-t, .border-b, .border-l, .border-r, .border-b-2, .border-2 { border-color: #4b5563; }
+        .bg-blue-50 { background-color: rgba(59, 130, 246, 0.15) !important; }
+        .bg-blue-100 { background-color: rgba(59, 130, 246, 0.25) !important; }
+        .text-blue-600 { color: #60a5fa !important; }
+        input:not(.bg-transparent), select, textarea { background-color: #374151 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        textarea.auto-extend { field-sizing: content; min-height: 1.5em; }
+        .drag-handle { touch-action: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDcH7BFp9xghWLdgvsLseo3XyJG_opf9A8",
+            authDomain: "icarus2-50e01.firebaseapp.com",
+            databaseURL: "https://icarus2-50e01-default-rtdb.firebaseio.com",
+            projectId: "icarus2-50e01",
+            storageBucket: "icarus2-50e01.firebasestorage.app",
+            messagingSenderId: "67456823",
+            appId: "1:67456823:web:9b90f0c93d3cd1c7a394b2"
+        };
+
+        let globalFirebase = null;
+        function getFirebaseContext() {
+            if (globalFirebase) return globalFirebase;
+            const app = window.FirebaseSDK.initializeApp(firebaseConfig);
+            const auth = window.FirebaseSDK.getAuth(app);
+            let db;
+            try {
+                db = window.FirebaseSDK.initializeFirestore(app, {
+                    localCache: window.FirebaseSDK.persistentLocalCache({
+                        tabManager: window.FirebaseSDK.persistentMultipleTabManager()
+                    })
+                });
+            } catch (e) {
+                db = window.FirebaseSDK.getFirestore(app);
+            }
+            globalFirebase = { app, auth, db };
+            return globalFirebase;
         }
-    }, []);
 
-    // 新增：當景點變動時，自動縮放地圖至範圍內
-    useEffect(() => {
-        const map = mapInstanceRef.current;
-        if (!map || !places || places.length === 0) return;
-        
-        const validPoints = places.filter(p => p.lat && p.lng).map(p => [p.lat, p.lng]);
-        if (validPoints.length > 0) {
-            const bounds = L.latLngBounds(validPoints);
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        const getFutureDate = (daysToAdd) => {
+            const date = new Date();
+            date.setDate(date.getDate() + daysToAdd);
+            const mm = date.getMonth() + 1;
+            const dd = date.getDate();
+            const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()];
+            return `${date.getFullYear()}/${mm}/${dd} (${dayOfWeek})`;
+        };
+
+        const formatNumber = (amount, decimals = 0) => Number(amount).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+        const formatJPY = (amount) => Number(amount).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        const deg2rad = (deg) => deg * (Math.PI / 180);
+
+        const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
+            const R = 6371; 
+            const dLat = deg2rad(lat2 - lat1);
+            const dLon = deg2rad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        };
+
+        const calculateTravelInfo = (p1, p2) => {
+            if (!p1 || !p2 || !p1.lat || !p1.lng || !p2.lat || !p2.lng) return null;
+            const dist = getDistanceFromLatLonInKm(p1.lat, p1.lng, p2.lat, p2.lng);
+            const walkMin = Math.round((dist / 5) * 60); 
+            const driveMin = Math.round((dist / 30) * 60) + 5; 
+            const format = (m) => m > 60 ? `${Math.floor(m/60)}小時${m%60}分` : `${m}分`;
+            return { walk: format(walkMin), drive: format(driveMin), dist };
+        };
+
+        const getEndTime = (timeStr, hoursToAdd = 1) => {
+            if (!timeStr) return '';
+            let [h, m] = timeStr.split(':').map(Number);
+            const addH = Math.floor(hoursToAdd);
+            const addM = Math.round((hoursToAdd - addH) * 60);
+            m += addM; h += addH + Math.floor(m / 60); m = m % 60; h = h % 24;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+
+        const formatShortDate = (dateStr) => {
+            if (!dateStr) return '';
+            const parts = dateStr.split(' ')[0].split('/');
+            if (parts.length === 3) return `${parseInt(parts[1], 10)}/${parseInt(parts[2], 10)}`;
+            return dateStr;
+        };
+
+        const getCategoryName = (type) => {
+            const map = { food: '餐飲', shopping: '購物', transport: '交通', sight: '景點', accommodation: '住宿' };
+            return map[type] || '其他';
+        };
+
+        const INITIAL_TRIP_DATA = { 
+            trip: { id: 'trip-default', title: '我的旅行', dates: '2026/04/03 - 2026/04/06', icon: '🚀', days: [{ id: 1, date: '2026/04/03 (五)', title: '出發', places: [], color: '#3b82f6', weather: { type: 'sun', minTemp: 22, maxTemp: 28, label: '晴天' } }] }, 
+            members: [{ id: 'm1', name: '我', color: 'bg-blue-500', avatar: '👤' }], expenses: [], shoppingItems: [], packingList: [] 
+        };
+
+        const Icon = ({ path, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
+        );
+
+        const Icons = {
+            Clock: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />,
+            MapPin: (p) => <Icon {...p} path={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>} />,
+            Plus: (p) => <Icon {...p} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />,
+            Minus: (p) => <Icon {...p} path={<line x1="5" y1="12" x2="19" y2="12"/>} />,
+            Users: (p) => <Icon {...p} path={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
+            Trash2: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />,
+            ArrowLeft: (p) => <Icon {...p} path={<><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></>} />,
+            MoreVertical: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></>} />,
+        };
+
+        const OnlineUserBadge = () => {
+            const [onlineUsers, setOnlineUsers] = useState(1);
+            useEffect(() => {
+                setOnlineUsers(Math.floor(Math.random() * 5) + 1);
+                const interval = setInterval(() => setOnlineUsers(prev => Math.max(1, prev + (Math.floor(Math.random() * 3) - 1))), 5000);
+                return () => clearInterval(interval);
+            }, []);
+            return (
+                <div className="flex items-center gap-1.5 bg-green-50/10 text-green-400 px-3 py-1 rounded-full text-xs font-bold border border-green-500/20 shrink-0">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span>{onlineUsers} 人在線</span>
+                </div>
+            );
+        };
+
+        const TravelSegmentUI = ({ p1, p2, onUpdateMode, onMouseEnter, onMouseLeave }) => {
+            const mode = p1.travelMode || 'drive'; 
+            const travelInfo = calculateTravelInfo(p1, p2);
+            if (!travelInfo) return null;
+            return (
+                <div className="flex items-center gap-3 py-1.5 px-3 bg-slate-800/90 border border-slate-600 shadow-md rounded-xl" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+                    <div className="flex bg-slate-900 border border-slate-700 rounded-lg p-0.5 h-7 items-center">
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('drive'); }} className={`w-7 h-6 rounded-md flex items-center justify-center text-sm leading-none transition-all ${mode === 'drive' ? 'bg-blue-600 text-white scale-105' : 'text-slate-500'}`}>🚗</button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('walk'); }} className={`w-7 h-6 rounded-md flex items-center justify-center text-sm leading-none transition-all ${mode === 'walk' ? 'bg-blue-600 text-white scale-105' : 'text-slate-500'}`}>🚶</button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('straight'); }} className={`w-7 h-6 rounded-md flex items-center justify-center transition-all ${mode === 'straight' ? 'bg-blue-600 text-white scale-105' : 'text-slate-500'}`}><Icons.Minus size={12} /></button>
+                    </div>
+                    <div className="text-xs font-bold text-amber-400">{mode === 'straight' ? `直線 ${travelInfo.dist.toFixed(1)} km` : mode === 'walk' ? `步行 ${travelInfo.walk}` : `車程 ${travelInfo.drive}`}</div>
+                </div>
+            );
+        };
+
+        const RealMap = React.memo(({ places, zoomControlKey }) => {
+            const mapRef = useRef(null);
+            const mapInstanceRef = useRef(null);
+            useEffect(() => {
+                if (!mapInstanceRef.current) {
+                    const map = L.map(mapRef.current, { zoomControl: false }).setView([22.5, 114.1], 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    mapInstanceRef.current = map;
+                }
+            }, []);
+            return <div ref={mapRef} className="w-full h-full z-0" />;
+        });
+
+        function Dashboard({ trips, onCreateTrip, onSelectTrip }) {
+            return (
+                <div className="flex justify-center h-full bg-[#0f172a] overflow-y-auto w-full relative">
+                    <div className="max-w-[960px] w-full px-4">
+                        <div className="my-10 flex justify-between items-center">
+                            <h1 className="text-3xl font-bold text-slate-100">我的行程 🚀</h1>
+                            <button onClick={onCreateTrip} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg">建立新行程</button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                            {trips.map((tripData) => (
+                                <div key={tripData.id} onClick={() => onSelectTrip(tripData.id)} className="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 hover:border-blue-500 transition-all cursor-pointer group">
+                                    <div className="h-40 bg-slate-700 relative flex items-center justify-center text-4xl">{tripData.trip?.icon || '🚀'}</div>
+                                    <div className="p-5">
+                                        <h3 className="font-bold text-lg text-slate-100 truncate">{tripData.trip?.title || '未命名'}</h3>
+                                        <p className="text-sm text-slate-400">{tripData.trip?.dates}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
         }
-    }, [places]);
 
-    return <div ref={mapRef} className="w-full h-full z-0" />;
-});
+        function TripPlanner({ tripId, onBack, db, user }) {
+            const [trip, setTrip] = useState({ title: '', dates: '', days: [] });
+            const [members, setMembers] = useState([]);
+            const [packingList, setPackingList] = useState([]);
+            const [activeTab, setActiveTab] = useState('itinerary'); 
+            const [activeDayId, setActiveDayId] = useState(null);
+            const [panelMode, setPanelMode] = useState('list'); 
+            const [newItem, setNewItem] = useState({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1' });
+            const [toast, setToast] = useState(null);
+            const [expandedNotes, setExpandedNotes] = useState({});
+            const [showPackingModal, setShowPackingModal] = useState(false);
+            const [newPackingItem, setNewPackingItem] = useState({ text: '', owner: 'all' });
+            const [packingFilter, setPackingFilter] = useState('all');
+
+            const SHARED_APP_ID = "main-travel-planner-v2";
+
+            useEffect(() => {
+                if (!user || !tripId) return;
+                const tripDocRef = window.FirebaseSDK.doc(db, 'artifacts', SHARED_APP_ID, 'public', 'data', 'trips', tripId);
+                return window.FirebaseSDK.onSnapshot(tripDocRef, (snap) => {
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        setTrip(data.trip || {});
+                        setMembers(data.members || []);
+                        setPackingList(data.packingList || []);
+                        if (!activeDayId && data.trip?.days?.length > 0) setActiveDayId(data.trip.days[0].id);
+                    }
+                });
+            }, [user, tripId]);
+
+            const pushUpdate = (data) => window.FirebaseSDK.updateDoc(window.FirebaseSDK.doc(db, 'artifacts', SHARED_APP_ID, 'public', 'data', 'trips', tripId), data);
+            const showMsg = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+            const activeDayData = useMemo(() => trip.days?.find(d => d.id === activeDayId) || trip.days?.[0], [trip, activeDayId]);
+
+            return (
+                <div className="flex flex-col h-[100dvh] bg-slate-900 text-slate-100 font-sans relative">
+                    {toast && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-toast"><div className="bg-slate-800 text-white px-6 py-3 rounded-full border border-slate-700 font-bold"><span>{toast}</span></div></div>}
+                    <header className="h-14 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900 z-20">
+                        <div className="flex items-center gap-3">
+                            <button onClick={onBack} className="p-1.5 bg-slate-800 rounded-full"><Icons.ArrowLeft size={20} /></button>
+                            <span className="font-bold">{trip.title} 🚀</span>
+                        </div>
+                        <OnlineUserBadge />
+                    </header>
+                    <div className="flex border-b border-slate-800 bg-slate-900 px-4 gap-6 text-sm">
+                        <button onClick={() => setActiveTab('itinerary')} className={`py-3 border-b-2 ${activeTab === 'itinerary' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}>行程</button>
+                        <button onClick={() => setActiveTab('packing')} className={`py-3 border-b-2 ${activeTab === 'packing' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}>行李</button>
+                    </div>
+                    <div className="flex flex-1 overflow-hidden">
+                        {activeTab === 'itinerary' && (
+                            <>
+                                <div className="w-full md:w-[550px] flex flex-col border-r border-slate-800 bg-slate-900 transition-all overflow-hidden shrink-0">
+                                    {panelMode === 'list' ? (
+                                        <div className="p-4 overflow-y-auto h-full">
+                                            <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
+                                                {trip.days?.map((day, idx) => (
+                                                    <button key={day.id} onClick={() => setActiveDayId(day.id)} className={`px-4 py-2 rounded-xl border shrink-0 ${activeDayId === day.id ? 'bg-blue-600 border-blue-500' : 'bg-slate-800 border-slate-700'}`}>Day {idx+1}</button>
+                                                ))}
+                                            </div>
+                                            <div className="space-y-4">
+                                                {activeDayData?.places.map((p, i) => (
+                                                    <div key={p.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                                                        <div className="flex justify-between items-start">
+                                                            <div onClick={() => setExpandedNotes(prev => ({...prev, [p.id]: !prev[p.id]}))} className="flex-1 cursor-pointer">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-blue-400 font-mono text-xs">{p.time}</span>
+                                                                    <h3 className="font-bold">{p.name}</h3>
+                                                                </div>
+                                                                {expandedNotes[p.id] && <p className="mt-2 text-sm text-slate-400 whitespace-pre-wrap">{p.note}</p>}
+                                                            </div>
+                                                            <button onClick={() => { setNewItem({...p}); setPanelMode('edit'); }} className="p-1.5 text-slate-500 hover:text-white"><Icons.MoreVertical size={18} /></button>
+                                                        </div>
+                                                        {i < activeDayData.places.length - 1 && (
+                                                            <div className="mt-4 flex justify-center">
+                                                                <TravelSegmentUI p1={p} p2={activeDayData.places[i+1]} onUpdateMode={(m) => {
+                                                                    const newDays = trip.days.map(d => d.id === activeDayId ? {...d, places: d.places.map(pl => pl.id === p.id ? {...pl, travelMode: m} : pl)} : d);
+                                                                    pushUpdate({trip: {...trip, days: newDays}});
+                                                                }} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <button onClick={() => { setNewItem({id: '', name:'', time:'12:00', type:'sight', note:'', stayTime:'1'}); setPanelMode('add'); }} className="w-full py-4 border-2 border-dashed border-slate-700 rounded-xl mt-6 text-slate-500 font-bold">+ 新增景點</button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col h-full p-4">
+                                            <div className="flex items-center mb-6">
+                                                <button onClick={() => setPanelMode('list')} className="p-2"><Icons.ArrowLeft size={20}/></button>
+                                                <h2 className="text-xl font-bold ml-2">{panelMode === 'add' ? '新增景點' : '編輯景點資料'}</h2>
+                                            </div>
+                                            <div className="space-y-4 flex-1 overflow-y-auto pr-2">
+                                                <input placeholder="景點名稱" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 outline-none" />
+                                                <div className="flex gap-4">
+                                                    <input type="time" value={newItem.time} onChange={e => setNewItem({...newItem, time: e.target.value})} className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 outline-none" />
+                                                    <input type="number" step="0.5" placeholder="停留小時" value={newItem.stayTime} onChange={e => setNewItem({...newItem, stayTime: e.target.value})} className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 outline-none" />
+                                                </div>
+                                                <textarea placeholder="備註內容" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} rows="5" className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 outline-none resize-none" />
+                                                <button onClick={() => {
+                                                    if (!newItem.name) return showMsg("請輸入名稱");
+                                                    let newDays;
+                                                    if (panelMode === 'add') {
+                                                        const p = { ...newItem, id: 'p' + Date.now(), lat: 22.5, lng: 114.1 };
+                                                        newDays = trip.days.map(d => d.id === activeDayId ? {...d, places: [...d.places, p]} : d);
+                                                    } else {
+                                                        newDays = trip.days.map(d => d.id === activeDayId ? {...d, places: d.places.map(pl => pl.id === newItem.id ? newItem : pl)} : d);
+                                                    }
+                                                    pushUpdate({trip: {...trip, days: newDays}});
+                                                    setPanelMode('list');
+                                                }} className="w-full py-4 bg-blue-600 rounded-xl font-bold">儲存景點</button>
+                                                {panelMode === 'edit' && (
+                                                    <button onClick={() => {
+                                                        if (window.confirm("確定要刪除此景點嗎？")) {
+                                                            const newDays = trip.days.map(d => d.id === activeDayId ? {...d, places: d.places.filter(pl => pl.id !== newItem.id)} : d);
+                                                            pushUpdate({trip: {...trip, days: newDays}});
+                                                            setPanelMode('list');
+                                                            showMsg("🗑️ 已刪除");
+                                                        }
+                                                    }} className="w-full py-4 bg-slate-800 border border-red-500/50 text-red-400 rounded-xl font-bold flex items-center justify-center gap-2 mt-4"><Icons.Trash2 size={18} /> 刪除景點</button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 hidden md:block">
+                                    <RealMap places={activeDayData?.places || []} zoomControlKey={activeDayId} />
+                                </div>
+                            </>
+                        )}
+                        {activeTab === 'packing' && (
+                            <div className="w-full p-4 overflow-y-auto">
+                                <div className="max-w-xl mx-auto space-y-6 pb-20">
+                                    <select value={packingFilter} onChange={e => setPackingFilter(e.target.value)} className="w-full p-3 rounded-xl bg-slate-800 border border-slate-700">
+                                        <option value="all">👥 全體清單</option>
+                                        {members.map(m => <option key={m.id} value={m.name}>{m.avatar} {m.name}</option>)}
+                                    </select>
+                                    <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden divide-y divide-slate-700">
+                                        {packingList.filter(i => packingFilter === 'all' || i.owner === packingFilter || i.owner === 'all').map(item => (
+                                            <div key={item.id} className="p-4 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <input type="checkbox" checked={item.checked} onChange={() => pushUpdate({packingList: packingList.map(i => i.id === item.id ? {...i, checked: !i.checked} : i)})} className="w-5 h-5 rounded" />
+                                                    <span className={item.checked ? 'line-through text-slate-500' : ''}>{item.text}</span>
+                                                    {item.owner === 'all' && <span className="text-[10px] bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded">全體</span>}
+                                                </div>
+                                                <button onClick={() => pushUpdate({packingList: packingList.filter(i => i.id !== item.id)})} className="text-slate-600"><Icons.Trash2 size={18}/></button>
+                                            </div>
+                                        ))}
+                                        <button onClick={() => { setNewPackingItem({text: '', owner: packingFilter}); setShowPackingModal(true); }} className="w-full p-4 text-blue-400 font-bold">+ 新增行李項目</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    {showPackingModal && (
+                        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 p-6 rounded-2xl w-full max-w-xs border border-slate-700">
+                                <h3 className="text-lg font-bold mb-4">新增行李</h3>
+                                <input autoFocus placeholder="物品名稱" value={newPackingItem.text} onChange={e => setNewPackingItem({...newPackingItem, text: e.target.value})} className="w-full p-3 rounded-xl bg-slate-900 mb-4 outline-none border border-slate-700" />
+                                <select value={newPackingItem.owner} onChange={e => setNewPackingItem({...newPackingItem, owner: e.target.value})} className="w-full p-3 rounded-xl bg-slate-900 mb-6 outline-none border border-slate-700">
+                                    <option value="all">👥 全體成員</option>
+                                    {members.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                </select>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowPackingModal(false)} className="flex-1 py-3 text-slate-400">取消</button>
+                                    <button onClick={() => {
+                                        if(!newPackingItem.text) return;
+                                        pushUpdate({packingList: [...packingList, {id: Date.now(), ...newPackingItem, checked: false}]});
+                                        setShowPackingModal(false);
+                                    }} className="flex-1 py-3 bg-blue-600 rounded-xl font-bold">新增</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function MainApp() {
+            const [user, setUser] = useState(null);
+            const [currentView, setCurrentView] = useState('dashboard');
+            const [activeTripId, setActiveTripId] = useState(null);
+            const [trips, setTrips] = useState([]);
+            const { db, auth } = getFirebaseContext();
+            const SHARED_APP_ID = "main-travel-planner-v2";
+
+            useEffect(() => {
+                window.FirebaseSDK.signInAnonymously(auth).catch(() => {});
+                return window.FirebaseSDK.onAuthStateChanged(auth, setUser);
+            }, [auth]);
+
+            useEffect(() => {
+                if (!user) return;
+                const tripsCollection = window.FirebaseSDK.collection(db, 'artifacts', SHARED_APP_ID, 'public', 'data', 'trips');
+                return window.FirebaseSDK.onSnapshot(tripsCollection, (snapshot) => {
+                    const fetched = [];
+                    snapshot.forEach(doc => fetched.push({ id: doc.id, ...doc.data() }));
+                    setTrips(fetched);
+                });
+            }, [user, db]);
+
+            if (!user) return <div className="h-screen flex items-center justify-center bg-slate-900 text-blue-400 font-bold">🚀 啟動中...</div>;
+
+            if (currentView === 'dashboard') return <Dashboard trips={trips} onSelectTrip={(id) => { setActiveTripId(id); setCurrentView('planner'); }} onCreateTrip={async () => {
+                const nid = 'trip_' + Date.now();
+                await window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', SHARED_APP_ID, 'public', 'data', 'trips', nid), INITIAL_TRIP_DATA);
+            }} />;
+
+            return <TripPlanner tripId={activeTripId} onBack={() => setCurrentView('dashboard')} db={db} user={user} />;
+        }
+
+            ReactDOM.createRoot(document.getElementById('root')).render(<MainApp />);
+    </script>
+</body>
+</html>
