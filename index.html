@@ -151,8 +151,9 @@
         };
 
         const INITIAL_TRIP_DATA = { 
-            trip: { id: 'trip-default', title: '我的旅行', dates: '2026/04/03 - 2026/04/06', icon: '🚀', days: [{ id: 1, date: '2026/04/03 (五)', title: '出發', places: [], color: '#3b82f6', weather: { type: 'sun', minTemp: 22, maxTemp: 28, label: '晴天' } }] }, 
-            members: [{ id: 'm1', name: '我', color: 'bg-blue-500', avatar: '👤' }], expenses: [], shoppingItems: [], packingList: [] 
+            trip: { id: 'trip-sz-macau', title: '深圳澳門四日遊', dates: `2026/04/03 - 2026/04/06`, icon: '🚀', author: 'CANDY', days: [{ id: 1, date: '2026/04/03 (五)', title: '深圳出發', color: '#f9115d', weather: { type: 'cloud', minTemp: 22, maxTemp: 28, label: '多雲' }, places: [] }] }, 
+            members: [{ id: 'm1', name: 'CANDY', color: 'bg-pink-500', avatar: '👩' }, { id: 'm2', name: '神雲', color: 'bg-blue-500', avatar: '🧑' }], 
+            expenses: [], shoppingItems: [], packingList: [] 
         };
 
         const Icon = ({ path, size = 24, className = "" }) => (
@@ -164,10 +165,25 @@
             MapPin: (p) => <Icon {...p} path={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>} />,
             Plus: (p) => <Icon {...p} path={<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>} />,
             Minus: (p) => <Icon {...p} path={<line x1="5" y1="12" x2="19" y2="12"/>} />,
-            Users: (p) => <Icon {...p} path={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
             Trash2: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />,
             ArrowLeft: (p) => <Icon {...p} path={<><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></>} />,
             MoreVertical: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></>} />,
+            ChevronDown: (p) => <Icon {...p} path={<polyline points="6 9 12 15 18 9" />} />,
+            ChevronUp: (p) => <Icon {...p} path={<polyline points="18 15 12 9 6 15" />} />,
+            Users: (p) => <Icon {...p} path={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />
+        };
+
+        const CategoryIcon = ({ type, size = 20 }) => {
+            const baseClass = "rounded-full flex items-center justify-center text-white shrink-0";
+            const style = { width: `${size*2}px`, height: `${size*2}px` };
+            switch(type) {
+                case 'food': return <div className={`${baseClass} bg-orange-400`} style={style}>🍴</div>;
+                case 'shopping': return <div className={`${baseClass} bg-pink-400`} style={style}>🛍️</div>;
+                case 'transport': return <div className={`${baseClass} bg-blue-400`} style={style}>🚌</div>;
+                case 'sight': return <div className={`${baseClass} bg-green-500`} style={style}>📍</div>;
+                case 'accommodation': return <div className={`${baseClass} bg-purple-500`} style={style}>🏨</div>;
+                default: return <div className={`${baseClass} bg-gray-400`} style={style}>📄</div>;
+            }
         };
 
         const OnlineUserBadge = () => {
@@ -189,19 +205,24 @@
             const mode = p1.travelMode || 'drive'; 
             const travelInfo = calculateTravelInfo(p1, p2);
             if (!travelInfo) return null;
+            const getTravelText = () => {
+                if (mode === 'straight') return `直線 ${travelInfo.dist.toFixed(1)} km`;
+                if (mode === 'walk') return `步行約 ${travelInfo.walk}`;
+                return `車程約 ${travelInfo.drive}`;
+            };
             return (
-                <div className="flex items-center gap-3 py-1.5 px-3 bg-slate-800/90 border border-slate-600 shadow-md rounded-xl" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
+                <div className="flex items-center gap-3 py-1.5 px-3 bg-slate-800/90 border border-slate-600 shadow-md rounded-xl group" onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
                     <div className="flex bg-slate-900 border border-slate-700 rounded-lg p-0.5 h-7 items-center">
-                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('drive'); }} className={`w-7 h-6 rounded-md flex items-center justify-center text-sm leading-none transition-all ${mode === 'drive' ? 'bg-blue-600 text-white scale-105' : 'text-slate-500'}`}>🚗</button>
-                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('walk'); }} className={`w-7 h-6 rounded-md flex items-center justify-center text-sm leading-none transition-all ${mode === 'walk' ? 'bg-blue-600 text-white scale-105' : 'text-slate-500'}`}>🚶</button>
-                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('straight'); }} className={`w-7 h-6 rounded-md flex items-center justify-center transition-all ${mode === 'straight' ? 'bg-blue-600 text-white scale-105' : 'text-slate-500'}`}><Icons.Minus size={12} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('drive'); }} className={`w-7 h-6 rounded flex items-center justify-center transition-all ${mode === 'drive' ? 'bg-blue-600 text-white' : 'text-slate-500'}`} style={{fontSize: '14px'}}>🚗</button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('walk'); }} className={`w-7 h-6 rounded flex items-center justify-center transition-all ${mode === 'walk' ? 'bg-blue-600 text-white' : 'text-slate-500'}`} style={{fontSize: '14px'}}>🚶</button>
+                        <button onClick={(e) => { e.stopPropagation(); onUpdateMode('straight'); }} className={`w-7 h-6 rounded flex items-center justify-center transition-all ${mode === 'straight' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}><Icons.Minus size={12} /></button>
                     </div>
-                    <div className="text-xs font-bold text-amber-400">{mode === 'straight' ? `直線 ${travelInfo.dist.toFixed(1)} km` : mode === 'walk' ? `步行 ${travelInfo.walk}` : `車程 ${travelInfo.drive}`}</div>
+                    <div className="text-[13px] font-black text-amber-400">{getTravelText()}</div>
                 </div>
             );
         };
 
-        const RealMap = React.memo(({ places, zoomControlKey }) => {
+        const RealMap = React.memo(({ places }) => {
             const mapRef = useRef(null);
             const mapInstanceRef = useRef(null);
             useEffect(() => {
@@ -275,6 +296,7 @@
             return (
                 <div className="flex flex-col h-[100dvh] bg-slate-900 text-slate-100 font-sans relative">
                     {toast && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-toast"><div className="bg-slate-800 text-white px-6 py-3 rounded-full border border-slate-700 font-bold"><span>{toast}</span></div></div>}
+                    
                     <header className="h-14 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900 z-20">
                         <div className="flex items-center gap-3">
                             <button onClick={onBack} className="p-1.5 bg-slate-800 rounded-full"><Icons.ArrowLeft size={20} /></button>
@@ -282,14 +304,16 @@
                         </div>
                         <OnlineUserBadge />
                     </header>
+
                     <div className="flex border-b border-slate-800 bg-slate-900 px-4 gap-6 text-sm">
                         <button onClick={() => setActiveTab('itinerary')} className={`py-3 border-b-2 ${activeTab === 'itinerary' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}>行程</button>
                         <button onClick={() => setActiveTab('packing')} className={`py-3 border-b-2 ${activeTab === 'packing' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}>行李</button>
                     </div>
+
                     <div className="flex flex-1 overflow-hidden">
                         {activeTab === 'itinerary' && (
                             <>
-                                <div className="w-full md:w-[550px] flex flex-col border-r border-slate-800 bg-slate-900 transition-all overflow-hidden shrink-0">
+                                <div className="w-full md:w-[550px] flex flex-col border-r border-slate-800 bg-slate-900 transition-all overflow-hidden">
                                     {panelMode === 'list' ? (
                                         <div className="p-4 overflow-y-auto h-full">
                                             <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
@@ -308,7 +332,7 @@
                                                                 </div>
                                                                 {expandedNotes[p.id] && <p className="mt-2 text-sm text-slate-400 whitespace-pre-wrap">{p.note}</p>}
                                                             </div>
-                                                            <button onClick={() => { setNewItem({...p}); setPanelMode('edit'); }} className="p-1.5 text-slate-500 hover:text-white"><Icons.MoreVertical size={18} /></button>
+                                                            <button onClick={() => { setNewItem({ ...p }); setPanelMode('edit'); }} className="p-1.5 text-slate-500 hover:text-white"><Icons.MoreVertical size={18} /></button>
                                                         </div>
                                                         {i < activeDayData.places.length - 1 && (
                                                             <div className="mt-4 flex justify-center">
@@ -345,25 +369,24 @@
                                                     } else {
                                                         newDays = trip.days.map(d => d.id === activeDayId ? {...d, places: d.places.map(pl => pl.id === newItem.id ? newItem : pl)} : d);
                                                     }
-                                                    pushUpdate({trip: {...trip, days: newDays}});
-                                                    setPanelMode('list');
+                                                    pushUpdate({trip: {...trip, days: newDays}}); setPanelMode('list');
                                                 }} className="w-full py-4 bg-blue-600 rounded-xl font-bold">儲存景點</button>
                                                 {panelMode === 'edit' && (
                                                     <button onClick={() => {
                                                         if (window.confirm("確定要刪除此景點嗎？")) {
                                                             const newDays = trip.days.map(d => d.id === activeDayId ? {...d, places: d.places.filter(pl => pl.id !== newItem.id)} : d);
-                                                            pushUpdate({trip: {...trip, days: newDays}});
-                                                            setPanelMode('list');
-                                                            showMsg("🗑️ 已刪除");
+                                                            pushUpdate({trip: {...trip, days: newDays}}); setPanelMode('list'); showMsg("已刪除景點");
                                                         }
-                                                    }} className="w-full py-4 bg-slate-800 border border-red-500/50 text-red-400 rounded-xl font-bold flex items-center justify-center gap-2 mt-4"><Icons.Trash2 size={18} /> 刪除景點</button>
+                                                    }} className="w-full py-4 bg-slate-800 border border-red-500/50 text-red-400 rounded-xl font-bold flex items-center justify-center gap-2 mt-4">
+                                                        <Icons.Trash2 size={18} /> 刪除景點
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>
                                     )}
                                 </div>
                                 <div className="flex-1 hidden md:block">
-                                    <RealMap places={activeDayData?.places || []} zoomControlKey={activeDayId} />
+                                    <RealMap places={activeDayData?.places || []} />
                                 </div>
                             </>
                         )}
@@ -391,6 +414,7 @@
                             </div>
                         )}
                     </div>
+
                     {showPackingModal && (
                         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
                             <div className="bg-slate-800 p-6 rounded-2xl w-full max-w-xs border border-slate-700">
@@ -402,11 +426,7 @@
                                 </select>
                                 <div className="flex gap-3">
                                     <button onClick={() => setShowPackingModal(false)} className="flex-1 py-3 text-slate-400">取消</button>
-                                    <button onClick={() => {
-                                        if(!newPackingItem.text) return;
-                                        pushUpdate({packingList: [...packingList, {id: Date.now(), ...newPackingItem, checked: false}]});
-                                        setShowPackingModal(false);
-                                    }} className="flex-1 py-3 bg-blue-600 rounded-xl font-bold">新增</button>
+                                    <button onClick={() => { if(!newPackingItem.text) return; pushUpdate({packingList: [...packingList, {id: Date.now(), ...newPackingItem, checked: false}]}); setShowPackingModal(false); }} className="flex-1 py-3 bg-blue-600 rounded-xl font-bold">新增</button>
                                 </div>
                             </div>
                         </div>
@@ -432,8 +452,7 @@
                 if (!user) return;
                 const tripsCollection = window.FirebaseSDK.collection(db, 'artifacts', SHARED_APP_ID, 'public', 'data', 'trips');
                 return window.FirebaseSDK.onSnapshot(tripsCollection, (snapshot) => {
-                    const fetched = [];
-                    snapshot.forEach(doc => fetched.push({ id: doc.id, ...doc.data() }));
+                    const fetched = []; snapshot.forEach(doc => fetched.push({ id: doc.id, ...doc.data() }));
                     setTrips(fetched);
                 });
             }, [user, db]);
@@ -448,7 +467,7 @@
             return <TripPlanner tripId={activeTripId} onBack={() => setCurrentView('dashboard')} db={db} user={user} />;
         }
 
-            ReactDOM.createRoot(document.getElementById('root')).render(<MainApp />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<MainApp />);
     </script>
 </body>
 </html>
