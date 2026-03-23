@@ -930,7 +930,6 @@
                 pushUpdate({ trip: { ...trip, days: newDays } });
             };
 
-            // 修正刪除驗證邏輯
             const confirmDeletePlace = () => {
                 const newDays = trip.days.map(d => String(d.id) === String(activeDayId) ? { ...d, places: d.places.filter(p => p.id !== placeToDelete) } : d);
                 pushUpdate({ trip: { ...trip, days: newDays } });
@@ -943,7 +942,6 @@
                 setExpandedNotes(prev => ({ ...prev, [placeId]: !prev[placeId] }));
             };
 
-            // 修正拖曳邏輯：必須有 Drag Handle 觸發
             const handleDragStart = (e, idx, pId) => { 
                 if (dragEnabledId !== pId) { 
                     e.preventDefault(); 
@@ -1161,7 +1159,7 @@
                                                     <span className="text-xs font-bold">新增</span>
                                                 </button>
                                             </div>
-                                            <div className="px-4 py-4 overflow-y-auto flex-1 pb-48">
+                                            <div className="px-4 py-4 overflow-y-auto flex-1 pb-32">
                                                 <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-xl mb-4 border border-slate-700/50">
                                                     <div className="flex flex-col">
                                                         <h3 className="font-bold text-blue-400">{activeDayData?.title}</h3>
@@ -1241,6 +1239,11 @@
                                                                                     
                                                                                     {/* 卡片右側的動作按鈕列 */}
                                                                                     <div className="flex items-center gap-1 shrink-0 ml-2">
+                                                                                        {/* 直接刪除按鈕 (免進選單) */}
+                                                                                        <button onClick={(e) => { e.stopPropagation(); setPlaceToDelete(p.id); }} className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-700 rounded-lg transition-colors" title="刪除景點">
+                                                                                            <Icons.Trash2 size={18} />
+                                                                                        </button>
+                                                                                        
                                                                                         {/* 右側拖曳把手 2：明確的 Grip 圖示 */}
                                                                                         <div 
                                                                                             onMouseEnter={() => setDragEnabledId(p.id)} 
@@ -1309,7 +1312,7 @@
                                                 </div>
                                             )}
 
-                                            <div className="overflow-y-auto p-4 flex-1 pb-20">
+                                            <div className="overflow-y-auto p-4 flex-1 pb-32">
                                                 {(panelMode === 'edit' || (panelMode === 'add' && addModalTab === 'custom')) && (
                                                     <form onSubmit={panelMode === 'add' ? handleManualAddSubmit : handleEditSubmit} className="space-y-4">
                                                         <div className="flex justify-between items-baseline mb-2">
@@ -1383,7 +1386,15 @@
                                                                     <Icons.Camera size={16} /> 更換圖片
                                                                     <input type="file" accept="image/*" className="hidden" onChange={e => { handlePlaceImageUpload(activeDayId, newItem.id, e); showMsg('✅ 圖片已更新'); }} />
                                                                 </label>
-                                                                <button type="button" onClick={() => setPlaceToDelete(newItem.id)} className="px-4 py-2.5 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-xl font-bold transition-all border border-slate-600 hover:border-red-500/50 flex items-center justify-center gap-2 shadow-sm">
+                                                                <button 
+                                                                    type="button" 
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        if(newItem.id) setPlaceToDelete(newItem.id);
+                                                                    }} 
+                                                                    className="px-4 py-2.5 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-xl font-bold transition-all border border-slate-600 hover:border-red-500/50 flex items-center justify-center gap-2 shadow-sm cursor-pointer relative z-10"
+                                                                >
                                                                     <Icons.Trash2 size={16} /> 刪除
                                                                 </button>
                                                             </div>
