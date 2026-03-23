@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer" />
     <title>旅遊行程規劃助手 - 完美路線版</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -201,7 +202,7 @@
             id: 'trip-sz-macau',
             title: '深圳澳門四日遊',
             dates: `2026/04/03 - 2026/04/06`,
-            icon: '🇲🇴',
+            icon: '🚀',
             author: 'CANDY',
             days: [
                 {
@@ -1119,7 +1120,7 @@
                         <div className="flex items-center gap-3 flex-1">
                             <button onClick={onBack} className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-300"><Icons.ArrowLeft size={20} /></button>
                             <div className={`w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold hover:scale-105 transition-transform`}>
-                                <input value={trip.icon || '✈️'} onChange={e => pushUpdate({trip:{...trip, icon:e.target.value}})} className="w-full h-full bg-transparent text-center text-lg outline-none cursor-pointer" maxLength="2"/>
+                                <input value={trip.icon || '🚀'} onChange={e => pushUpdate({trip:{...trip, icon:e.target.value}})} className="w-full h-full bg-transparent text-center text-lg outline-none cursor-pointer" maxLength="2"/>
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
                                 <input value={trip.title} onChange={(e) => pushUpdate({trip:{...trip, title:e.target.value}})} className="text-sm font-bold bg-transparent outline-none w-full" />
@@ -1569,7 +1570,7 @@
             if (currentView === 'dashboard') return <Dashboard trips={trips} onCreateTrip={async () => {
                 const nid = 'trip_' + Date.now();
                 await window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', nid), { 
-                    trip: { id: nid, title: '新行程', dates: getFutureDate(0), icon: '✈️', days: [{id: 1, title: 'Day 1', date: getFutureDate(0), places: [], weather: { type: 'sun', minTemp: 20, maxTemp: 25, label: '晴天' }}] }, 
+                    trip: { id: nid, title: '新行程', dates: getFutureDate(0), icon: '🚀', days: [{id: 1, title: 'Day 1', date: getFutureDate(0), places: [], weather: { type: 'sun', minTemp: 20, maxTemp: 25, label: '晴天' }}] }, 
                     members: [{ id: 'm1', name: '我', color: 'bg-blue-500', avatar: '👤' }], 
                     expenses: [], shoppingItems: [], packingList: [] 
                 });
