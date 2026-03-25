@@ -855,7 +855,7 @@
                 if (!val.trim()) { setAddressSuggestions([]); return; }
                 searchTimeoutRef.current = setTimeout(async () => {
                     try {
-                        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5`);
+                        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5&accept-language=zh-TW,zh,en`);
                         const data = await res.json(); setAddressSuggestions(data || []);
                     } catch(e) {}
                 }, 800);
@@ -872,7 +872,7 @@
                 if (!newItem.address) return showMsg("請先輸入地址或關鍵字！");
                 setIsSearchingAddress(true);
                 try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newItem.address)}&limit=1`);
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newItem.address)}&limit=1&accept-language=zh-TW,zh,en`);
                     const data = await res.json();
                     if (data && data.length > 0) {
                         const { lat, lon, display_name } = data[0];
