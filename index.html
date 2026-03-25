@@ -163,6 +163,42 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         };
 
+        // --- 座標轉換：高德(GCJ-02) 轉 WGS-84 (國際標準) ---
+        // 解決高德地圖座標放在國際開源地圖上會產生偏移的問題
+        const gcj02towgs84 = (lng, lat) => {
+            const PI = Math.PI;
+            const a = 6378245.0;
+            const ee = 0.00669342162296594323;
+
+            const transformLat = (x, y) => {
+                let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+                ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0;
+                ret += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0;
+                return ret;
+            };
+
+            const transformLng = (x, y) => {
+                let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+                ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0;
+                ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0;
+                ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0;
+                return ret;
+            };
+
+            let dlat = transformLat(lng - 105.0, lat - 35.0);
+            let dlng = transformLng(lng - 105.0, lat - 35.0);
+            let radlat = lat / 180.0 * PI;
+            let magic = Math.sin(radlat);
+            magic = 1 - ee * magic * magic;
+            let sqrtmagic = Math.sqrt(magic);
+            dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * PI);
+            dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * PI);
+            let mglat = lat + dlat;
+            let mglng = lng + dlng;
+            return [lng * 2 - mglng, lat * 2 - mglat];
+        };
+
         const calculateTravelInfo = (p1, p2) => {
             if (!p1 || !p2 || !p1.lat || !p1.lng || !p2.lat || !p2.lng) return null;
             const dist = getDistanceFromLatLonInKm(p1.lat, p1.lng, p2.lat, p2.lng);
@@ -728,6 +764,11 @@
             const [shoppingItems, setShoppingItems] = useState([]);
             const [packingList, setPackingList] = useState([]);
             
+            // ==========================================
+            // 已幫你綁定申請好的高德地圖 Web 服務 API Key！
+            // ==========================================
+            const AMAP_KEY = '3bf27a17038b433640ab774dafa1d0a6'; 
+
             const [activeTab, setActiveTab] = useState('itinerary'); 
             const [activeDayId, setActiveDayId] = useState(1);
             
@@ -849,41 +890,64 @@
                 return () => document.removeEventListener('paste', handleGlobalPaste);
             }, [activeTab]);
 
+            // ===== 修改此處：替換為高德地圖搜尋 =====
             const handleAddressInput = (e) => {
                 const val = e.target.value; setNewItem(p => ({...p, address: val}));
                 if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
                 if (!val.trim()) { setAddressSuggestions([]); return; }
                 searchTimeoutRef.current = setTimeout(async () => {
+                    if (AMAP_KEY === '請替換成你的高德API_KEY') {
+                        showMsg("請先在程式碼中填寫高德 API Key！");
+                        return;
+                    }
                     try {
-                        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&limit=5&accept-language=zh-TW,zh,en`);
-                        const data = await res.json(); setAddressSuggestions(data || []);
+                        const res = await fetch(`https://restapi.amap.com/v3/place/text?keywords=${encodeURIComponent(val)}&offset=5&page=1&key=${AMAP_KEY}`);
+                        const data = await res.json();
+                        if (data.status === '1' && data.pois) {
+                            setAddressSuggestions(data.pois);
+                        }
                     } catch(e) {}
                 }, 800);
             };
 
             const handleSuggestionClick = (s) => {
-                const name = s.display_name.split(',')[0];
-                setNewItem(p => ({...p, address: s.display_name, name: p.name || name}));
-                setTempMarker({ lat: parseFloat(s.lat), lng: parseFloat(s.lon), name });
+                const name = s.name;
+                const address = typeof s.address === 'string' && s.address.length > 0 ? s.address : s.adname;
+                setNewItem(p => ({...p, address: name, name: p.name || name}));
+                
+                // 高德資料含有經緯度，進行座標校正
+                if (s.location && s.location.length > 0) {
+                    const [lngStr, latStr] = s.location.split(',');
+                    const [wgsLng, wgsLat] = gcj02towgs84(parseFloat(lngStr), parseFloat(latStr));
+                    setTempMarker({ lat: wgsLat, lng: wgsLng, name });
+                }
                 setAddressSuggestions([]);
             };
 
             const handleAddressSearch = async () => {
                 if (!newItem.address) return showMsg("請先輸入地址或關鍵字！");
+                if (AMAP_KEY === '請替換成你的高德API_KEY') return showMsg("請先在程式碼中填寫高德 API Key！");
                 setIsSearchingAddress(true);
                 try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(newItem.address)}&limit=1&accept-language=zh-TW,zh,en`);
+                    const res = await fetch(`https://restapi.amap.com/v3/place/text?keywords=${encodeURIComponent(newItem.address)}&offset=1&page=1&key=${AMAP_KEY}`);
                     const data = await res.json();
-                    if (data && data.length > 0) {
-                        const { lat, lon, display_name } = data[0];
-                        const shortName = display_name.split(',')[0];
-                        setTempMarker({ lat: parseFloat(lat), lng: parseFloat(lon), name: shortName });
-                        if (!newItem.name) setNewItem(prev => ({...prev, name: shortName}));
-                        showMsg("已找到地點！");
+                    if (data.status === '1' && data.pois && data.pois.length > 0) {
+                        const s = data.pois[0];
+                        const name = s.name;
+                        if (s.location && s.location.length > 0) {
+                            const [lngStr, latStr] = s.location.split(',');
+                            const [wgsLng, wgsLat] = gcj02towgs84(parseFloat(lngStr), parseFloat(latStr));
+                            setTempMarker({ lat: wgsLat, lng: wgsLng, name });
+                            if (!newItem.name) setNewItem(prev => ({...prev, name: name}));
+                            showMsg("已找到地點！");
+                        } else {
+                            showMsg("找不到該地點的座標。");
+                        }
                     } else showMsg("找不到該地點。");
                 } catch(e) { showMsg("搜尋時發生錯誤。"); }
                 setIsSearchingAddress(false);
             };
+            // ========================================
 
             const handleManualAddSubmit = (e) => {
                 e.preventDefault();
@@ -1331,8 +1395,8 @@
                                                                 <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 rounded-xl border border-slate-600 z-[100] shadow-2xl overflow-hidden divide-y divide-slate-700">
                                                                     {addressSuggestions.map((s, idx) => (
                                                                         <div key={idx} onClick={() => handleSuggestionClick(s)} className="p-3 hover:bg-slate-700 cursor-pointer transition-colors">
-                                                                            <div className="text-sm font-bold text-slate-100">{s.display_name.split(',')[0]}</div>
-                                                                            <div className="text-[10px] text-slate-400 truncate">{s.display_name}</div>
+                                                                            <div className="text-sm font-bold text-slate-100">{s.name}</div>
+                                                                            <div className="text-[10px] text-slate-400 truncate">{typeof s.address === 'string' && s.address.length > 0 ? s.address : s.adname}</div>
                                                                         </div>
                                                                     ))}
                                                                 </div>
