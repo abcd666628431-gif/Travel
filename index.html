@@ -1596,18 +1596,18 @@
                                                     <CategoryIconWithLabel type={cat.type} size={18} />
                                                     <h3 className={`font-bold ${cat.color} tracking-wide`}>{cat.title} ({places.length})</h3>
                                                 </div>
-                                                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-3 px-1">
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 px-1">
                                                     {places.map(p => (
                                                         <div key={`${p.id}-${p.dayIdx}`} onClick={() => handleJumpToPlace(p)} className="bg-slate-800 rounded-lg border border-slate-700 flex flex-col overflow-hidden hover:border-blue-500 transition-all shadow-sm cursor-pointer group relative">
                                                             <div className="w-full aspect-square bg-slate-700/50 relative flex items-center justify-center overflow-hidden">
-                                                                {p.image ? <img src={p.image} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="pointer-events-none opacity-30"><CategoryIconWithLabel type={p.type} size={14} /></div>}
+                                                                {p.image ? <img src={p.image} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="pointer-events-none opacity-30"><CategoryIconWithLabel type={p.type} size={24} /></div>}
                                                                 {p.image && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 pointer-events-none"></div>}
                                                             </div>
-                                                            <div className="flex flex-col p-1.5 relative text-center">
-                                                                <h4 className="font-bold text-slate-100 text-[10px] md:text-xs line-clamp-1 group-hover:text-blue-400 transition-colors w-full" title={p.name}>{p.name}</h4>
-                                                                <div className="flex items-center gap-1 mt-0.5 justify-center opacity-70">
-                                                                    <span className="text-[9px] font-bold text-blue-400">D{p.dayIdx}</span>
-                                                                    <span className="text-[9px] text-slate-400 font-mono">{p.time}</span>
+                                                            <div className="flex flex-col p-2.5 relative text-center">
+                                                                <h4 className="font-bold text-slate-100 text-xs md:text-sm line-clamp-1 group-hover:text-blue-400 transition-colors w-full" title={p.name}>{p.name}</h4>
+                                                                <div className="flex items-center gap-1.5 mt-1 justify-center opacity-70">
+                                                                    <span className="text-[10px] md:text-xs font-bold text-blue-400">D{p.dayIdx}</span>
+                                                                    <span className="text-[10px] md:text-xs text-slate-400 font-mono">{p.time}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
