@@ -38,24 +38,19 @@
         body { margin: 0; padding: 0; overflow: hidden; background: #0f172a; height: 100dvh; width: 100vw; color: #f3f4f6; }
         #root { height: 100%; width: 100%; }
         .leaflet-div-icon { background: transparent; border: none; }
-        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
         .animate-toast { animation: fadeIn 0.3s ease-out forwards; }
-        
         .dragging { opacity: 1 !important; background: #1e293b; border: 2px dashed #3b82f6; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); transform: scale(1.02); z-index: 50; }
         input:not(.bg-transparent), select, textarea { background-color: #374151 !important; color: #f3f4f6 !important; border-color: #4b5563 !important; }
-        
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
         textarea.auto-extend { field-sizing: content; min-height: 1.5em; }
         .drag-handle { touch-action: none; }
         img[alt="東京地鐵路線圖"] { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
-
         @keyframes routeFlow { to { stroke-dashoffset: -24; } }
         .route-flow-anim { stroke-dasharray: 8 16 !important; animation: routeFlow 0.8s linear infinite !important; pointer-events: none; }
-
         .custom-range { -webkit-appearance: none; background: transparent; }
         .custom-range:focus { outline: none; }
         .custom-range::-webkit-slider-runnable-track { width: 100%; height: 8px; background: #334155; border-radius: 4px; cursor: pointer; }
@@ -141,7 +136,6 @@
         };
 
         const formatNumber = (amount, decimals = 0) => Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-        const formatJPY = (amount) => Number(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
         const deg2rad = (deg) => deg * (Math.PI / 180);
 
         const PI = Math.PI; const a = 6378245.0; const ee = 0.00669342162296594323;
@@ -364,7 +358,6 @@
                 return () => { isMounted = false; };
             }, [places, dayColor]); 
 
-            // Handle Map FlyTo on Hover Segment/Place
             useEffect(() => {
                 const map = mapInstanceRef.current; if (!map) return;
                 Object.entries(markersRef.current).forEach(([placeId, data]) => {
@@ -671,7 +664,6 @@
 
             const toggleNote = (placeId, e) => { e.stopPropagation(); setExpandedNotes(prev => ({ ...prev, [placeId]: !prev[placeId] })); };
 
-            // --- Itinerary Drag and Drop ---
             const handleDragStart = (e, idx, pId) => { if (dragEnabledId !== pId) { e.preventDefault(); return; } e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', pId); setDraggedPlaceIndex(idx); draggedPlaceIndexRef.current = idx; };
             const handleDrop = (e, dropIdx) => { 
                 e.preventDefault(); e.stopPropagation(); 
@@ -685,7 +677,6 @@
             };
             const handleDragEnd = () => { setDraggedPlaceIndex(null); setDragEnabledId(null); setDragOverPlaceIndex(null); draggedPlaceIndexRef.current = null; };
 
-            // --- Packing Drag and Drop ---
             const handlePackingDragStart = (e, pId) => { if (dragEnabledPackingId !== pId) { e.preventDefault(); return; } setDraggedPackingId(pId); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', pId); };
             const handlePackingDrop = (e, targetId) => { 
                 e.preventDefault(); e.stopPropagation(); const draggedId = e.dataTransfer.getData('text/plain') || draggedPackingId; if (!draggedId || draggedId === targetId) return; 
@@ -699,7 +690,6 @@
             };
             const handlePackingDragEnd = () => { setDraggedPackingId(null); setDragEnabledPackingId(null); setDragOverPackingId(null); };
 
-            // --- Expense Drag and Drop ---
             const handleExpenseDragStart = (e, pId) => { if (dragEnabledExpenseId !== pId) { e.preventDefault(); return; } setDraggedExpenseId(pId); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', pId); };
             const handleExpenseDrop = (e, targetId) => { 
                 e.preventDefault(); e.stopPropagation(); const draggedId = e.dataTransfer.getData('text/plain') || draggedExpenseId; if (!draggedId || draggedId === targetId) return; 
@@ -841,14 +831,14 @@
                                             <div className="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto my-1.5 md:hidden"></div>
                                             <div ref={daysContainerRef} onMouseDown={(e) => { isDraggingDay.current = true; dragStartX.current = e.pageX; dragScrollLeft.current = daysContainerRef.current.scrollLeft; dragHasMoved.current = false; }} onMouseLeave={() => { isDraggingDay.current = false; }} onMouseUp={() => { isDraggingDay.current = false; }} onMouseMove={(e) => { if(!isDraggingDay.current) return; const x = e.pageX; const walk = (x - dragStartX.current); if (Math.abs(walk) > 5) { dragHasMoved.current = true; daysContainerRef.current.scrollLeft = dragScrollLeft.current - walk; } }} className="bg-slate-900 border-b border-slate-800 px-2 pb-2 md:px-3 md:pb-3 md:py-4 flex flex-nowrap gap-1.5 md:gap-3 overflow-x-auto no-scrollbar shadow-sm cursor-grab active:cursor-grabbing select-none shrink-0">
                                                 {trip.days?.map((day, idx) => (
-                                                    <button key={day.id} onClick={() => { if(!dragHasMoved.current) setActiveDayId(day.id); }} className={`relative flex flex-col items-start min-w-[48px] md:min-w-[100px] shrink-0 px-1.5 py-1 md:p-3 rounded-md md:rounded-xl border ${activeDayId === day.id ? 'bg-blue-900/40 border-blue-500 ring-1 md:ring-2 ring-blue-500 shadow-md' : 'bg-slate-800 border-slate-700'}`}>
+                                                    <button key={day.id} onClick={() => { if(!dragHasMoved.current) setActiveDayId(day.id); }} className={`relative flex flex-col items-center justify-center min-w-[44px] md:min-w-[100px] shrink-0 p-1 md:p-3 rounded-md md:rounded-xl border ${activeDayId === day.id ? 'bg-blue-900/40 border-blue-500 ring-1 md:ring-2 ring-blue-500 shadow-md' : 'bg-slate-800 border-slate-700'}`}>
                                                         {activeDayId === day.id && trip.days?.length > 1 && (
                                                             <div onClick={(e) => { e.stopPropagation(); setShowDeleteDayConfirm(true); }} className="absolute -top-1.5 -right-1.5 w-4 h-4 md:w-5 md:h-5 bg-slate-600/60 hover:bg-slate-500/80 backdrop-blur-sm text-slate-200 rounded-full flex items-center justify-center shadow-md z-10 pointer-events-auto transition-colors" title="刪除此天"><Icons.X size={10} className="md:hidden" /><Icons.X size={12} className="hidden md:block" /></div>
                                                         )}
-                                                        <div className="flex justify-between items-center w-full mb-0 md:mb-1.5 pointer-events-none gap-1"><span className={`text-[9px] md:text-sm font-bold ${activeDayId === day.id ? 'text-blue-400' : 'text-slate-400'}`}>D{idx + 1}</span><div className="scale-50 origin-right md:scale-100"><WeatherIcon type={day.weather?.type} size={16} /></div></div><span className="text-[8px] md:text-xs font-medium text-slate-500 pointer-events-none mt-0 md:mt-0">{formatShortDate(day.date)}</span>
+                                                        <div className="flex items-center gap-0.5 md:gap-1 w-full justify-center pointer-events-none"><span className={`text-[10px] md:text-sm font-bold ${activeDayId === day.id ? 'text-blue-400' : 'text-slate-400'}`}>D{idx + 1}</span><div className="scale-75 md:scale-100"><WeatherIcon type={day.weather?.type} size={16} /></div></div><span className="text-[8px] md:text-xs font-medium text-slate-500 pointer-events-none mt-0.5">{formatShortDate(day.date)}</span>
                                                     </button>
                                                 ))}
-                                                <button onClick={() => { if(!dragHasMoved.current) handleAddDay(); }} className="min-w-[40px] md:min-w-[80px] px-1 py-1 md:p-3 rounded-md md:rounded-xl border-2 border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors flex flex-col items-center justify-center"><div className="bg-slate-800 rounded-full p-0.5 md:p-1.5 mb-0.5 md:mb-1.5 pointer-events-none scale-50 md:scale-100"><Icons.Plus size={18} /></div><span className="text-[8px] md:text-xs font-bold pointer-events-none">新增</span></button>
+                                                <button onClick={() => { if(!dragHasMoved.current) handleAddDay(); }} className="min-w-[44px] md:min-w-[80px] p-1 md:p-3 rounded-md md:rounded-xl border-2 border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors flex flex-col items-center justify-center"><div className="bg-slate-800 rounded-full p-0.5 md:p-1.5 mb-0.5 md:mb-1.5 pointer-events-none scale-75 md:scale-100"><Icons.Plus size={18} /></div><span className="text-[8px] md:text-xs font-bold pointer-events-none">新增</span></button>
                                             </div>
                                             
                                             <div className="itinerary-list-container px-3 md:px-4 py-4 overflow-y-auto flex-1 pb-32">
@@ -925,7 +915,6 @@
                                         <div className="flex items-end gap-3 text-right"><div className="text-sm text-slate-400 mb-1">{expenseFilter === 'all' ? '總計花費' : '成員花費'}</div><div className="text-3xl font-bold text-slate-100 font-mono">{displayCurrency} {formatNumber(filteredTotalDisplay, displayCurrency === 'JPY' ? 0 : 1)}</div></div>
                                     </div>
                                     <div className="flex flex-nowrap gap-4 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar items-start">
-                                        
                                         {orphanedExpenses.length > 0 && expenseFilter === 'all' && (
                                             <div key="orphaned" className="w-[85vw] sm:w-[260px] lg:flex-1 lg:min-w-[230px] lg:max-w-[320px] flex-shrink-0 snap-start space-y-4 animate-fade-in bg-red-900/20 p-4 rounded-2xl border border-red-700/50">
                                                 <div className="flex items-center gap-3 px-2"><div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-inner text-lg bg-slate-700">👻</div><div className="flex flex-col"><h3 className="font-bold text-red-300 tracking-wide text-lg">未知/已刪除</h3><span className="text-[11px] font-bold text-red-400 bg-red-900/40 px-2 py-0.5 rounded-full border border-red-700/50 w-max mt-1">殘留 {orphanedExpenses.length} 筆</span></div></div>
@@ -971,7 +960,7 @@
                                                                         <div className="flex justify-between items-start gap-2 flex-1 min-w-0">
                                                                             <div className="min-w-0 flex-1"><div className="flex items-center gap-2 mb-1"><CategoryIconWithLabel type={item.category} size={12} /><div className="font-bold text-slate-200 text-sm truncate">{item.title}</div></div><div className="text-[10px] text-slate-500">{formatShortDate(item.date)}</div>{item.sharedBy && item.sharedBy.length > 0 && (<div className="text-[10px] text-slate-400 mt-1 flex flex-wrap gap-1 items-center">分攤: <div className="flex -space-x-1">{item.sharedBy.map(name => { const info = getMemberInfo(name); return (<div key={name} className={`w-4 h-4 rounded-full border border-slate-700 flex items-center justify-center text-[8px] text-white shadow-sm overflow-hidden ${info.avatar?.startsWith('data:image') ? 'bg-slate-800' : (info.color || 'bg-slate-600')}`} title={name}>{info.avatar?.startsWith('data:image') ? <img src={info.avatar} className="w-full h-full object-cover" /> : info.avatar}</div>); })}</div></div>)}</div>
                                                                             <div className="text-right shrink-0 relative"><div className="font-bold text-slate-100 text-sm font-mono leading-none">{displayCurrency} {formatNumber(convertedDisplayAmt, displayCurrency === 'JPY' ? 0 : 1)}</div>{originalCurr !== displayCurrency && <div className="text-[10px] text-slate-500 font-mono mt-1 leading-none">支付用 ({originalCurr} {formatNumber(originalAmount, originalCurr === 'JPY' ? 0 : 1)})</div>}{collectAmount > 0.01 && (<div className="mt-1.5 inline-block text-[10px] font-bold text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded border border-green-500/20">需收回 {formatNumber(collectAmount, displayCurrency === 'JPY' ? 0 : 1)}</div>)}
-                                                                                <div className="flex items-center gap-1 mt-2 justify-end">{item.image && (<button onClick={() => setPreviewImage(item.image)} className="text-slate-500 hover:text-blue-400 p-1.5 rounded-md bg-slate-900 border border-slate-700 transition-colors"><Icons.Image size={12} /></button>)}<button onClick={(e) => { e.stopPropagation(); setActiveExpenseMenu(activeExpenseMenu?.id === item.id ? null : item); }} className="text-slate-500 hover:text-white p-1.5 rounded-md bg-slate-900 border border-slate-700 transition-colors"><Icons.MoreVertical size={12} /></button></div>
+                                                                                <div className="flex items-center gap-1 mt-2 justify-end"><button onClick={(e) => { e.stopPropagation(); setActiveExpenseMenu(activeExpenseMenu?.id === item.id ? null : item); }} className="text-slate-500 hover:text-white p-1.5 rounded-md bg-slate-900 border border-slate-700 transition-colors"><Icons.MoreVertical size={12} /></button></div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
