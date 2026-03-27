@@ -1771,6 +1771,7 @@
                                                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 px-1">
                                                         {places.map(p => (
                                                             <div key={`${p.id}-${p.dayIdx}`} onClick={() => handleJumpToPlace(p)} className="bg-slate-800 rounded-lg border border-slate-700 flex flex-col overflow-hidden hover:border-blue-500 transition-all shadow-sm cursor-pointer group relative">
+                                                                <button onClick={(e) => { e.stopPropagation(); setActiveDayId(p.dayId); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setPanelMode('edit'); setActiveTab('itinerary'); }} className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 hover:bg-blue-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all z-20 shadow-md backdrop-blur-sm" title="編輯景點"><Icons.MoreVertical size={14} /></button>
                                                                 <div className="w-full aspect-square bg-slate-700/50 relative flex items-center justify-center overflow-hidden">
                                                                     {p.image ? <img src={p.image} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="pointer-events-none opacity-30"><CategoryIconWithLabel type={p.type} size={24} /></div>}
                                                                     {p.image && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 pointer-events-none"></div>}
@@ -1842,22 +1843,25 @@
                                                                                             </div>
                                                                                             <div className="flex-1 min-w-0 relative p-2 md:p-2.5 flex flex-col justify-between">
                                                                                                 <div className="flex justify-between items-start gap-1">
-                                                                                                    <div className="flex flex-col min-w-0">
-                                                                                                        <h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>
-                                                                                                        {p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}
-                                                                                                    </div>
+                                                                                                <div className="flex flex-col min-w-0">
+                                                                                                    <h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>
+                                                                                                    {p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}
+                                                                                                </div>
+                                                                                                <div className="flex items-center gap-0.5 shrink-0 ml-1">
                                                                                                     <div
                                                                                                         onMouseEnter={() => setDragEnabledOverviewId(p.id)}
                                                                                                         onMouseLeave={() => setDragEnabledOverviewId(null)}
                                                                                                         onTouchStart={() => setDragEnabledOverviewId(p.id)}
                                                                                                         onTouchEnd={() => setDragEnabledOverviewId(null)}
                                                                                                         onClick={(e) => e.stopPropagation()}
-                                                                                                        className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"
+                                                                                                        className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors"
                                                                                                     >
                                                                                                         <Icons.GripVertical size={14} />
                                                                                                     </div>
+                                                                                                    <button onClick={(e) => { e.stopPropagation(); setActiveDayId(day.id); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setPanelMode('edit'); setActiveTab('itinerary'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="編輯景點"><Icons.MoreVertical size={14} /></button>
                                                                                                 </div>
-                                                                                                <div className="flex items-center gap-1.5 mt-1 justify-between">
+                                                                                            </div>
+                                                                                            <div className="flex items-center gap-1.5 mt-1 justify-between">
                                                                                                     <span className="px-1.5 py-0.5 rounded text-[9px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span>
                                                                                                     <span className="text-[9px] text-slate-500 font-medium">停留 {p.stayTime || '1'}h</span>
                                                                                                 </div>
