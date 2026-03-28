@@ -629,27 +629,36 @@
                     const size = Math.min(width, height);
                     canvas.width = 150; canvas.height = 150;
                     ctx.drawImage(img, (width - size) / 2, (height - size) / 2, size, size, 0, 0, 150, 150);
-                    return canvas.toDataURL('image/jpeg', 0.6); // 頭像也進一步壓縮
+                    let url = canvas.toDataURL('image/webp', 0.6);
+                    if (url.startsWith('data:image/png')) url = canvas.toDataURL('image/jpeg', 0.6);
+                    return url;
                 }
                 
-                // 極致壓縮模式：將最大解析度從 800px 降至 600px，大幅減少基礎容量
-                const maxSize = 600; 
-                if (width > height && width > maxSize) { height *= maxSize / width; width = maxSize; }
-                else if (height > maxSize) { width *= maxSize / height; height = maxSize; }
+                // 極致微縮：將最大邊長限制在 400px，適合預覽小圖，大幅度降低基礎容量
+                const maxSize = 400; 
+                if (width > height && width > maxSize) { height = Math.round(height * maxSize / width); width = maxSize; }
+                else if (height > maxSize) { width = Math.round(width * maxSize / height); height = maxSize; }
                 
                 canvas.width = width; canvas.height = height;
                 ctx.drawImage(img, 0, 0, width, height);
                 
-                // 起始畫質調為 0.6
-                let quality = 0.6; 
-                let dataUrl = canvas.toDataURL('image/jpeg', quality);
+                let quality = 0.6;
+                // 優先使用 WebP 黑科技
+                let format = 'image/webp';
+                let dataUrl = canvas.toDataURL(format, quality);
                 
-                // 目標容量壓低至約 35KB (約 45,000 字元)，讓單一行程能塞 25~30 張以上的照片
-                const maxLen = 45000; 
-                // 允許最低畫質降到 0.05 (5%)
+                // 【關鍵防禦】部分設備不支援 WebP，會強制輸出肥大的 PNG，此時立刻切換回 JPEG 保命
+                if (dataUrl.startsWith('data:image/png')) {
+                    format = 'image/jpeg';
+                    dataUrl = canvas.toDataURL(format, quality);
+                }
+                
+                // 強制將單張圖片的容量壓低至約 25KB 以內
+                // 這樣一個大行程檔案即使放了 30 張圖，也不會超過 Firebase 1MB (約 1,300,000 字元) 的限制
+                const maxLen = 30000; 
                 while (dataUrl.length > maxLen && quality > 0.05) {
                     quality -= 0.1;
-                    dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    dataUrl = canvas.toDataURL(format, quality);
                 }
                 
                 return dataUrl;
