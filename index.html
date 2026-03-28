@@ -55,6 +55,7 @@
         .custom-range:focus { outline: none; }
         .custom-range::-webkit-slider-runnable-track { width: 100%; height: 8px; background: #334155; border-radius: 4px; cursor: pointer; }
         .custom-range::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #3b82f6; cursor: pointer; margin-top: -6px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid #fff; }
+        .dark-map-tiles .leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(110%) grayscale(20%); }
     </style>
 </head>
 <body>
@@ -76,6 +77,8 @@
             Walking: (p) => <Icon {...p} path={<><path d="m9 20 1-5"/><path d="M10.7 7.5c-1.1.2-2.1.8-2.8 1.7L5.1 12"/><path d="M17 22V11l-2-3"/><path d="M15 15.5 17 22"/><path d="m15 15.5-3-4.5"/><path d="M12.5 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/></>} />,
             Bus: (p) => <Icon {...p} path={<><path d="M8 6v6"/><path d="M15 6v6"/><path d="M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></>} />,
             Map: (p) => <Icon {...p} path={<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>} />,
+            Moon: (p) => <Icon {...p} path={<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />} />,
+            Sun: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>} />,
             Users: (p) => <Icon {...p} path={<><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
             X: (p) => <Icon {...p} path={<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>} />,
             Trash2: (p) => <Icon {...p} path={<><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>} />,
@@ -264,6 +267,7 @@
         const RealMap = React.memo(({ places, hoveredId, hoveredSegmentId, zoomControlKey, dayColor, onRouteAltSelect, tempMarker }) => {
             const mapRef = useRef(null); const mapInstanceRef = useRef(null); const markersRef = useRef({}); const routeLayersRef = useRef({}); 
             const mapDataHashRef = useRef(''); const tempMarkerRef = useRef(null);
+            const [isMapDark, setIsMapDark] = useState(true);
 
             useEffect(() => {
                 if (mapInstanceRef.current) return;
@@ -375,7 +379,18 @@
                 });
             }, [hoveredSegmentId]);
 
-            return <div ref={mapRef} className="w-full h-full z-0 relative" />;
+            return (
+                <div className={`w-full h-full relative ${isMapDark ? 'dark-map-tiles' : ''}`}>
+                    <div ref={mapRef} className="w-full h-full z-0 relative" />
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsMapDark(!isMapDark); }}
+                        className="absolute top-4 right-4 z-[1000] bg-slate-800/90 text-yellow-400 p-2.5 rounded-xl shadow-lg border border-slate-600 hover:bg-slate-700 transition-colors flex items-center justify-center"
+                        title={isMapDark ? "切換至淺色地圖" : "切換至深色地圖"}
+                    >
+                        {isMapDark ? <Icons.Sun size={20} /> : <Icons.Moon size={20} className="text-blue-200" />}
+                    </button>
+                </div>
+            );
         });
 
         const Dashboard = ({ trips, onCreateTrip, onSelectTrip, onDeleteTrip, onImportTrip, onExportTrip, toast }) => {
@@ -433,6 +448,7 @@
             const [activeTab, setActiveTab] = useState('itinerary'); 
             const [activeDayId, setActiveDayId] = useState(1);
             const [panelMode, setPanelMode] = useState('list'); // 'list', 'add', 'edit'
+            const [modalMode, setModalMode] = useState('add'); // 'add', 'edit'
             const [newItem, setNewItem] = useState({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null });
             const [tempMarker, setTempMarker] = useState(null);
             const [addressSuggestions, setAddressSuggestions] = useState([]);
@@ -471,6 +487,7 @@
             const [showExpenseDetails, setShowExpenseDetails] = useState(false);
             const [showMemberSettings, setShowMemberSettings] = useState(false);
             const [showDeleteDayConfirm, setShowDeleteDayConfirm] = useState(false);
+            const [showEditPlaceModal, setShowEditPlaceModal] = useState(false);
             
             const [placeToDelete, setPlaceToDelete] = useState(null);
             const [expenseToDelete, setExpenseToDelete] = useState(null);
@@ -478,7 +495,6 @@
             
             const [expenseFilter, setExpenseFilter] = useState('all'); 
             const [packingFilter, setPackingFilter] = useState('all'); 
-            const [addModalTab, setAddModalTab] = useState('custom');
             const [newPackingItem, setNewPackingItem] = useState({ text: '', owner: '' });
             
             const [activePackingMenu, setActivePackingMenu] = useState(null);
@@ -603,13 +619,13 @@
             const activeDayData = useMemo(() => trip.days?.find(d => d.id === activeDayId) || trip.days?.[0], [trip, activeDayId]);
             const getMemberInfo = useCallback((name) => members.find(m => m.name === name) || { color: 'bg-gray-400', avatar: '👤', name: '未知' }, [members]);
 
-            const stateRef = useRef({ trip, activeDayId, hoveredPlaceId, panelMode, newItem, activeTab });
-            useEffect(() => { stateRef.current = { trip, activeDayId, hoveredPlaceId, panelMode, newItem, activeTab }; }, [trip, activeDayId, hoveredPlaceId, panelMode, newItem, activeTab]);
+            const stateRef = useRef({ trip, activeDayId, hoveredPlaceId, panelMode, modalMode, newItem, activeTab, showEditPlaceModal });
+            useEffect(() => { stateRef.current = { trip, activeDayId, hoveredPlaceId, panelMode, modalMode, newItem, activeTab, showEditPlaceModal }; }, [trip, activeDayId, hoveredPlaceId, panelMode, modalMode, newItem, activeTab, showEditPlaceModal]);
 
             useEffect(() => {
                 const handleGlobalPaste = (e) => {
                     const current = stateRef.current;
-                    if (current.activeTab !== 'itinerary' && current.panelMode === 'list') return;
+                    if (current.activeTab !== 'itinerary' && !current.showEditPlaceModal) return;
                     const items = e.clipboardData?.items; if (!items) return;
                     let imageFile = null; for (let i = 0; i < items.length; i++) { if (items[i].type.indexOf('image') !== -1) { imageFile = items[i].getAsFile(); break; } }
                     if (imageFile) {
@@ -621,7 +637,7 @@
                                 if (w > h) { if (w > maxSize) { h *= maxSize/w; w = maxSize; } } else { if (h > maxSize) { w *= maxSize/h; h = maxSize; } }
                                 canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h);
                                 const imageDataUrl = canvas.toDataURL('image/jpeg', 0.4);
-                                if (current.panelMode === 'add' || current.panelMode === 'edit') {
+                                if (current.panelMode === 'add' || current.panelMode === 'edit' || current.showEditPlaceModal) {
                                     setNewItem(prev => ({ ...prev, image: imageDataUrl })); showMsg('✅ 圖片已貼上預覽 (請記得儲存)');
                                 } else if (current.hoveredPlaceId) {
                                     const targetPlace = current.trip.days.flatMap(d => d.places).find(p => p.id === current.hoveredPlaceId); const targetName = targetPlace?.name?.trim();
@@ -683,7 +699,7 @@
                 let newDays = trip.days.map(d => ({ ...d, places: d.places.map(p => (p.name?.trim() === targetNameTrimmed ? { ...p, address: newItem.address || p.address, lat, lng, ...(imageToSave && !p.image ? { image: imageToSave } : {}) } : p)) }));
                 const dayIndex = newDays.findIndex(d => d.id === activeDayId);
                 if (dayIndex !== -1) { newDays[dayIndex].places.push(newP); if (newDays[dayIndex].places.length > 1) { newDays[dayIndex].places = cascadeTimes(newDays[dayIndex].places, newDays[dayIndex].places.length - 2); } }
-                pushUpdate({ trip: { ...trip, days: newDays } }); setPanelMode('list'); setTempMarker(null); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
+                pushUpdate({ trip: { ...trip, days: newDays } }); setPanelMode('list'); setTempMarker(null); setShowEditPlaceModal(false); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
             };
 
             const handleEditSubmit = (e) => {
@@ -693,7 +709,7 @@
                 const targetDayIndex = trip.days.findIndex(d => d.id === activeDayId); const currentPlaceIndex = targetDayIndex !== -1 ? trip.days[targetDayIndex].places.findIndex(p => p.id === newItem.id) : -1;
                 let newDays = trip.days.map(d => ({ ...d, places: d.places.map(p => { if (p.id === newItem.id) { return { ...p, name: newItem.name, note: newItem.note, type: newItem.type, time: newItem.time, stayTime: newItem.stayTime || '1', address: newItem.address || p.address, ...(lat ? { lat, lng } : {}), ...(imageToSave ? { image: imageToSave } : { image: null }) }; } else if (targetNameTrimmed !== '' && p.name?.trim() === targetNameTrimmed) { return { ...p, address: newItem.address || p.address, ...(lat ? { lat, lng } : {}), ...(imageToSave && !p.image ? { image: imageToSave } : {}) }; } return p; }) }));
                 if (targetDayIndex !== -1 && currentPlaceIndex !== -1) { newDays[targetDayIndex].places = cascadeTimes(newDays[targetDayIndex].places, currentPlaceIndex); }
-                pushUpdate({ trip: { ...trip, days: newDays } }); setPanelMode('list'); setTempMarker(null); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
+                pushUpdate({ trip: { ...trip, days: newDays } }); setPanelMode('list'); setTempMarker(null); setShowEditPlaceModal(false); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
             };
 
             const handleUpdateTravelMode = (dayId, placeId, newMode) => {
@@ -711,7 +727,7 @@
 
             const confirmDeletePlace = () => {
                 const newDays = trip.days.map(d => String(d.id) === String(activeDayId) ? { ...d, places: d.places.filter(p => p.id !== placeToDelete && p.id !== newItem.id) } : d);
-                pushUpdate({ trip: { ...trip, days: newDays } }); setPlaceToDelete(null); setPanelMode('list'); restoreListScroll();
+                pushUpdate({ trip: { ...trip, days: newDays } }); setPlaceToDelete(null); setPanelMode('list'); setShowEditPlaceModal(false); restoreListScroll();
             };
 
             const toggleNote = (placeId, e) => { e.stopPropagation(); setExpandedNotes(prev => ({ ...prev, [placeId]: !prev[placeId] })); };
@@ -998,7 +1014,7 @@
                                                             </button>
                                                         </div>
                                                         {addressSuggestions.length > 0 && (
-                                                            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg overflow-hidden shadow-2xl z-50">
+                                                            <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg overflow-hidden shadow-2xl z-50 max-h-48 overflow-y-auto">
                                                                 {addressSuggestions.map((s, idx) => (
                                                                     <div key={idx} onClick={() => handleSuggestionClick(s)} className="p-3 border-b border-slate-700 last:border-0 hover:bg-slate-700 cursor-pointer transition-colors">
                                                                         <div className="font-bold text-slate-200">{s.name}</div>
@@ -1276,7 +1292,7 @@
                                                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 px-1">
                                                         {places.map(p => (
                                                             <div key={`${p.id}-${p.dayIdx}`} onClick={() => handleJumpToPlace(p)} className="bg-slate-800 rounded-lg border border-slate-700 flex flex-col overflow-hidden hover:border-blue-500 transition-all shadow-sm cursor-pointer group relative">
-                                                                <button onClick={(e) => { e.stopPropagation(); setActiveDayId(p.dayId); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setPanelMode('edit'); }} className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 hover:bg-blue-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all z-20 shadow-md backdrop-blur-sm" title="編輯景點"><Icons.MoreVertical size={14} /></button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(p.dayId); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setModalMode('edit'); }} className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 hover:bg-blue-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all z-20 shadow-md backdrop-blur-sm" title="編輯景點"><Icons.MoreVertical size={14} /></button>
                                                                 <div className="w-full aspect-square bg-slate-700/50 relative flex items-center justify-center overflow-hidden">{p.image ? <img src={p.image} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="pointer-events-none opacity-30"><CategoryIconWithLabel type={p.type} size={24} /></div>}{p.image && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
                                                                 <div className="flex flex-col p-2.5 relative text-center"><h4 className="font-bold text-slate-100 text-xs md:text-sm line-clamp-1 group-hover:text-blue-400 transition-colors w-full" title={p.name}>{p.name}</h4><div className="flex items-center gap-1.5 mt-1 justify-center opacity-70"><span className="text-[10px] md:text-xs font-bold text-blue-400">D{p.dayIdx}</span><span className="text-[10px] md:text-xs text-slate-400 font-mono">{p.time}</span></div></div>
                                                             </div>
@@ -1317,7 +1333,7 @@
                                                                                         <div className="flex items-stretch overflow-hidden rounded-xl border border-slate-700 bg-slate-800 transition-all group-hover/card:border-blue-500 shadow-md h-full">
                                                                                             <div className="w-[70px] sm:w-[80px] bg-slate-700/50 shrink-0 relative overflow-hidden flex items-center justify-center">{p.image ? (<img src={p.image} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={16} /></div>)}</div>
                                                                                             <div className="flex-1 min-w-0 relative p-2 md:p-2.5 flex flex-col justify-between">
-                                                                                                <div className="flex justify-between items-start gap-1"><div className="flex flex-col min-w-0"><h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>{p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} onClick={(e) => e.stopPropagation()} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={14} /></div><button onClick={(e) => { e.stopPropagation(); setActiveDayId(day.id); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setPanelMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="編輯景點"><Icons.MoreVertical size={14} /></button></div></div>
+                                                                                                <div className="flex justify-between items-start gap-1"><div className="flex flex-col min-w-0"><h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>{p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} onClick={(e) => e.stopPropagation()} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={14} /></div><button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setModalMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="編輯景點"><Icons.MoreVertical size={14} /></button></div></div>
                                                                                                 <div className="flex items-center gap-1.5 mt-1 justify-between"><span className="px-1.5 py-0.5 rounded text-[9px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span><span className="text-[9px] text-slate-500 font-medium">停留 {p.stayTime || '1'}h</span></div>
                                                                                             </div>
                                                                                         </div>
@@ -1334,7 +1350,7 @@
                                                                     <div onDragOver={(e) => { e.preventDefault(); setDragOverOverview({ dayId: day.id, index: places.length }); }} onDrop={(e) => { handleOverviewDrop(e, day.id, places.length); setDragOverOverview(null); }} className={`w-full rounded-xl border-2 border-dashed transition-all flex items-center justify-center ${dragOverOverview?.dayId === day.id && dragOverOverview?.index === places.length ? 'h-16 mt-2 border-blue-400 bg-blue-500/10 opacity-100' : (draggedOverviewPlace ? 'h-10 mt-2 border-transparent opacity-0' : 'h-0 m-0 border-transparent opacity-0 pointer-events-none overflow-hidden')}`}><span className="text-xs font-bold text-blue-400 bg-blue-900/40 px-3 py-1 rounded-full">移至尾端</span></div>
                                                                 </>
                                                             )}
-                                                            <button onClick={() => { setActiveDayId(day.id); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); setPanelMode('add'); }} className="w-full py-3 mt-3 border-2 border-dashed border-slate-700/50 rounded-xl text-slate-500 font-bold hover:border-blue-500 hover:text-blue-400 hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"><Icons.Plus size={16} /> 新增行程景點</button>
+                                                            <button onClick={() => { setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); setModalMode('add'); }} className="w-full py-3 mt-3 border-2 border-dashed border-slate-700/50 rounded-xl text-slate-500 font-bold hover:border-blue-500 hover:text-blue-400 hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"><Icons.Plus size={16} /> 新增行程景點</button>
                                                         </div>
                                                     </div>
                                                 );
@@ -1347,6 +1363,102 @@
                     </div>
                     
                     {/* Action Modals */}
+                    {showEditPlaceModal && (
+                        <div className="fixed inset-0 bg-black/70 z-[120] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onClick={() => setShowEditPlaceModal(false)}>
+                            <div className="bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                                <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 shrink-0">
+                                    <h3 className="font-bold text-lg text-slate-100">{modalMode === 'add' ? '新增景點' : '編輯景點資料'}</h3>
+                                    <button onClick={() => setShowEditPlaceModal(false)} className="p-1 text-slate-500 hover:bg-slate-700 rounded-full"><Icons.X size={20}/></button>
+                                </div>
+                                <div className="p-5 overflow-y-auto flex-1">
+                                    <form onSubmit={modalMode === 'add' ? handleManualAddSubmit : handleEditSubmit} className="space-y-4">
+                                        <div className="flex justify-between items-baseline mb-2">
+                                            <h4 className="font-bold text-lg text-slate-100">基本資料</h4>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 mb-1">景點名稱</label>
+                                            <input required placeholder="*景點名稱" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                                        </div>
+                                        <div className="relative">
+                                            <label className="block text-xs font-bold text-slate-400 mb-1">搜尋更新地址 (選填)</label>
+                                            <div className="flex gap-2">
+                                                <input placeholder="輸入地址更新地圖位置" value={newItem.address || ''} onChange={handleAddressInput} className="flex-1 px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                                                <button type="button" onClick={handleAddressSearch} disabled={isSearchingAddress} className="bg-blue-600 p-2.5 rounded-lg transition-colors hover:bg-blue-500 disabled:opacity-50 text-white shrink-0 flex items-center justify-center">
+                                                    <Icons.Search size={18} />
+                                                </button>
+                                            </div>
+                                            {addressSuggestions.length > 0 && (
+                                                <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg overflow-hidden shadow-2xl z-50 max-h-48 overflow-y-auto">
+                                                    {addressSuggestions.map((s, idx) => (
+                                                        <div key={idx} onClick={() => handleSuggestionClick(s)} className="p-3 border-b border-slate-700 last:border-0 hover:bg-slate-700 cursor-pointer transition-colors">
+                                                            <div className="font-bold text-slate-200">{s.name}</div>
+                                                            <div className="text-xs text-slate-400 truncate mt-0.5">{s.address || s.adname}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-4 pt-2 border-t border-slate-700/50 mt-4">
+                                            <div className="flex-1">
+                                                <label className="block text-xs font-bold text-slate-400 mb-1">抵達時間</label>
+                                                <input type="time" required value={newItem.time} onChange={e => setNewItem({...newItem, time: e.target.value})} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none text-sm" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block text-xs font-bold text-slate-400 mb-1">停留時間 (小時)</label>
+                                                <input type="number" step="0.5" min="0" required value={newItem.stayTime} onChange={e => setNewItem({...newItem, stayTime: e.target.value})} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none text-sm" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 mb-1">景點類型</label>
+                                            <select value={newItem.type} onChange={e => setNewItem({...newItem, type: e.target.value})} className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none text-sm">
+                                                <option value="sight">景點</option>
+                                                <option value="food">餐廳</option>
+                                                <option value="shopping">購物</option>
+                                                <option value="transport">交通</option>
+                                                <option value="accommodation">住宿</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 mb-1">備註</label>
+                                            <textarea rows="3" value={newItem.note || ''} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 resize-none auto-extend" placeholder="輸入備註事項..."></textarea>
+                                        </div>
+                                        
+                                        {newItem.image ? (
+                                            <div className="relative w-full h-40 bg-slate-800 rounded-xl overflow-hidden mt-4 border border-slate-600 shadow-md group shrink-0">
+                                                <img src={newItem.image} className="w-full h-full object-cover" alt="Preview" />
+                                                <button type="button" onClick={() => setNewItem({...newItem, image: null})} className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full hover:bg-red-500 transition-colors z-10">
+                                                    <Icons.X size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="relative w-full h-40 bg-slate-800/50 rounded-xl mt-4 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors group cursor-pointer shrink-0">
+                                                <Icons.Image size={28} className="mb-2 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                                <span className="text-xs font-medium">點擊或貼上 (Ctrl+V) 圖片</span>
+                                                <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                            </div>
+                                        )}
+
+                                        <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold mt-4 shadow-lg transition-all">
+                                            {modalMode === 'add' ? '新增景點' : '儲存修改'}
+                                        </button>
+                                        
+                                        <div className="flex gap-4 pt-6 mt-4 border-t border-slate-800">
+                                            <label className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all text-center cursor-pointer border border-slate-600 flex justify-center items-center gap-2 text-sm shadow-sm" title="也可以直接在畫面 Ctrl+V 貼上圖片">
+                                                <Icons.Camera size={16} /> 上傳圖片
+                                                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                                            </label>
+                                            {modalMode === 'edit' && (
+                                                <button type="button" onClick={() => { setPlaceToDelete(newItem.id); setShowEditPlaceModal(false); }} className="px-4 py-2.5 bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-xl font-bold transition-all border border-slate-600 hover:border-red-500/50 flex items-center justify-center gap-2 shadow-sm cursor-pointer relative z-10">
+                                                    <Icons.Trash2 size={16} /> 刪除
+                                                </button>
+                                            )}
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeExpenseMenu && (
                         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setActiveExpenseMenu(null)}>
                             <div className="bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl w-64 overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
