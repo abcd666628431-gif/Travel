@@ -517,6 +517,7 @@
             const [showMemberSettings, setShowMemberSettings] = useState(false);
             const [showDeleteDayConfirm, setShowDeleteDayConfirm] = useState(false);
             const [showEditPlaceModal, setShowEditPlaceModal] = useState(false);
+            const [showClearOrphanedConfirm, setShowClearOrphanedConfirm] = useState(null); // 'expenses' | 'packing' | 'shopping'
             
             const [placeToDelete, setPlaceToDelete] = useState(null);
             const [expenseToDelete, setExpenseToDelete] = useState(null);
@@ -614,7 +615,6 @@
                     if (snap.exists()) {
                         const data = snap.data();
                         
-                        // 自動修復機制：偵測並修復重複或空白的景點 ID
                         let needsHeal = false;
                         const seenIds = new Set();
                         if (data.trip && data.trip.days) {
@@ -630,7 +630,27 @@
                                 }
                             });
                         }
-                        if (needsHeal) { window.FirebaseSDK.updateDoc(tripDocRef, { trip: data.trip }).catch(console.error); }
+
+                        // 幽靈掃蕩：自動修復殘留在「分攤名單(sharedBy)」中的無效成員，確保結算數學正確
+                        if (data.expenses && data.members) {
+                            const validNames = data.members.map(m => m.name);
+                            data.expenses.forEach(day => {
+                                if (day.items) {
+                                    day.items.forEach(item => {
+                                        if (item.sharedBy && Array.isArray(item.sharedBy)) {
+                                            const originalLen = item.sharedBy.length;
+                                            const newSharedBy = item.sharedBy.filter(n => validNames.includes(n));
+                                            if (newSharedBy.length !== originalLen) {
+                                                item.sharedBy = newSharedBy;
+                                                needsHeal = true;
+                                            }
+                                        }
+                                    });
+                                }
+                            });
+                        }
+
+                        if (needsHeal) { window.FirebaseSDK.updateDoc(tripDocRef, { trip: data.trip, expenses: data.expenses }).catch(console.error); }
 
                         if (data.trip) setTrip(data.trip); if (data.members) setMembers(data.members); if (data.expenses) setExpenses(data.expenses);
                         if (data.shoppingItems) setShoppingItems(data.shoppingItems); if (data.packingList) setPackingList(data.packingList);
@@ -930,6 +950,7 @@
             const orphanedExpenses = useMemo(() => { return (expenses || []).flatMap(day => day.items.filter(item => !members.some(m => m.name === item.payer)).map(item => ({ ...item, date: day.date }))).sort((a, b) => new Date(b.date) - new Date(a.date)); }, [expenses, members]);
             const orphanedTotalDisplay = useMemo(() => { return orphanedExpenses.reduce((sum, item) => sum + convertCurr(item.amount !== undefined ? item.amount : item.amountJPY, item.currency || 'JPY', displayCurrency), 0); }, [orphanedExpenses, displayCurrency, convertCurr]);
             const orphanedPacking = useMemo(() => { return (packingList || []).filter(item => !members.some(m => m.name === item.owner) && item.owner !== 'all'); }, [packingList, members]);
+            const orphanedShopping = useMemo(() => { return shoppingItems.filter(item => !members.some(m => m.name === item.requester)); }, [shoppingItems, members]);
 
             const filteredExpenses = useMemo(() => { let result = expenseFilter === 'all' ? [...expenses] : expenses.map(day => ({...day, items: day.items.filter(item => item.payer === expenseFilter || (item.sharedBy && item.sharedBy.includes(expenseFilter)))})).filter(day => day.items.length > 0); return result.sort((a, b) => new Date(b.date) - new Date(a.date)); }, [expenses, expenseFilter]);
             const filteredTotalDisplay = useMemo(() => { let total = 0; filteredExpenses.forEach(d => d.items.forEach(i => { total += convertCurr(i.amount !== undefined ? i.amount : i.amountJPY, i.currency || 'JPY', displayCurrency); })); return total; }, [filteredExpenses, displayCurrency, convertCurr]);
@@ -1246,7 +1267,14 @@
                                     <div className="flex flex-nowrap gap-4 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar items-start">
                                         {orphanedExpenses.length > 0 && expenseFilter === 'all' && (
                                             <div key="orphaned" className="w-[85vw] sm:w-[260px] lg:flex-1 lg:min-w-[230px] lg:max-w-[320px] flex-shrink-0 snap-start space-y-4 animate-fade-in bg-red-900/20 p-4 rounded-2xl border border-red-700/50">
-                                                <div className="flex items-center gap-3 px-2"><div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-inner text-lg bg-slate-700">👻</div><div className="flex flex-col"><h3 className="font-bold text-red-300 tracking-wide text-lg">未知/已刪除</h3><span className="text-[11px] font-bold text-red-400 bg-red-900/40 px-2 py-0.5 rounded-full border border-red-700/50 w-max mt-1">殘留 {orphanedExpenses.length} 筆</span></div></div>
+                                                <div className="flex items-center gap-3 px-2">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-inner text-lg bg-slate-700">👻</div>
+                                                    <div className="flex flex-col">
+                                                        <h3 className="font-bold text-red-300 tracking-wide text-lg">未知/已刪除</h3>
+                                                        <span className="text-[11px] font-bold text-red-400 bg-red-900/40 px-2 py-0.5 rounded-full border border-red-700/50 w-max mt-1">殘留 {orphanedExpenses.length} 筆</span>
+                                                    </div>
+                                                    <button onClick={() => setShowClearOrphanedConfirm('expenses')} className="ml-auto p-2 bg-red-900/40 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors border border-red-700/50 shadow-sm" title="一鍵清空"><Icons.Trash2 size={18}/></button>
+                                                </div>
                                                 <div className="bg-slate-900/50 rounded-xl border border-red-700/50 p-3 flex flex-col shadow-inner gap-2"><div className="flex justify-between items-center"><span className="text-xs text-red-400">殘留花費總額</span><div className="font-bold text-red-400 font-mono text-sm">{displayCurrency} {formatNumber(orphanedTotalDisplay, displayCurrency === 'JPY' ? 0 : 1)}</div></div><div className="border-t border-red-900/50"></div><span className="text-[10px] text-red-400/80 leading-tight">這些帳單的付款人已不存在於名單中，請刪除或修改。</span></div>
                                                 <div className="bg-slate-800 rounded-xl border border-red-700/50 overflow-hidden shadow-lg h-[50vh] overflow-y-auto no-scrollbar">
                                                     {orphanedExpenses.map((item) => {
@@ -1320,6 +1348,20 @@
                                         </div>
                                         <div className="flex items-end gap-3 text-right"><div className="text-sm text-slate-400 mb-1">預估總額</div><div className="text-3xl font-bold text-slate-100 font-mono">{displayCurrency} {formatNumber(shoppingTotalDisplay, displayCurrency === 'JPY' ? 0 : 1)}</div></div>
                                     </div>
+                                    
+                                    {orphanedShopping.length > 0 && (
+                                        <div className="bg-slate-800/40 rounded-2xl border border-red-700/50 p-4 shadow-lg mb-2 flex justify-between items-center animate-fade-in">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-inner text-lg bg-slate-700">👻</div>
+                                                <div>
+                                                    <h4 className="font-bold text-red-400">未知/已刪除</h4>
+                                                    <span className="text-[11px] font-bold text-red-400 bg-red-900/40 px-2 py-0.5 rounded-full border border-red-700/50 w-max mt-1 inline-block">殘留 {orphanedShopping.length} 項</span>
+                                                </div>
+                                            </div>
+                                            <button onClick={() => setShowClearOrphanedConfirm('shopping')} className="p-2 bg-red-900/40 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors border border-red-700/50 shadow-sm" title="清空殘留資料"><Icons.Trash2 size={18}/></button>
+                                        </div>
+                                    )}
+
                                     <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 overflow-hidden shadow-lg">
                                         {shoppingItems.length > 0 ? (
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
@@ -1352,7 +1394,14 @@
                                     <div className="flex flex-nowrap gap-4 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar items-start">
                                         {orphanedPacking.length > 0 && packingFilter === 'all' && (
                                             <div key="orphaned-packing" className="w-[85vw] sm:w-[260px] lg:flex-1 lg:min-w-[230px] lg:max-w-[320px] flex-shrink-0 snap-start space-y-4 animate-fade-in bg-red-900/20 p-4 rounded-2xl border border-red-700/50">
-                                                <div className="flex items-center gap-3 px-2"><div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-inner text-lg bg-slate-700">👻</div><div className="flex flex-col"><h3 className="font-bold text-red-300 tracking-wide text-lg">未知/已刪除</h3><span className="text-[11px] font-bold text-red-400 bg-red-900/40 px-2 py-0.5 rounded-full border border-red-700/50 w-max mt-1">殘留 {orphanedPacking.length} 項</span></div></div>
+                                                <div className="flex items-center gap-3 px-2">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-inner text-lg bg-slate-700">👻</div>
+                                                    <div className="flex flex-col">
+                                                        <h3 className="font-bold text-red-300 tracking-wide text-lg">未知/已刪除</h3>
+                                                        <span className="text-[11px] font-bold text-red-400 bg-red-900/40 px-2 py-0.5 rounded-full border border-red-700/50 w-max mt-1">殘留 {orphanedPacking.length} 項</span>
+                                                    </div>
+                                                    <button onClick={() => setShowClearOrphanedConfirm('packing')} className="ml-auto p-2 bg-red-900/40 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors border border-red-700/50 shadow-sm" title="一鍵清空"><Icons.Trash2 size={18}/></button>
+                                                </div>
                                                 <div className="bg-slate-800 rounded-xl border border-red-700/50 overflow-hidden shadow-lg h-[60vh] overflow-y-auto no-scrollbar">
                                                     {orphanedPacking.map((item) => {
                                                         const draggedIdxInList = orphanedPacking.findIndex(i => i.id === draggedPackingId); const currentItemIndex = orphanedPacking.findIndex(i => i.id === item.id); const isDraggingDown = draggedIdxInList !== -1 && draggedIdxInList < currentItemIndex; const isDraggingUp = draggedIdxInList === -1 || draggedIdxInList > currentItemIndex;
@@ -1875,6 +1924,33 @@
                     {shoppingToDelete && (
                         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
                             <div className="bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center border border-slate-700"><h3 className="font-bold text-lg text-slate-100">確定刪除此待買項目嗎？</h3><div className="flex gap-3 mt-6"><button onClick={() => setShoppingToDelete(null)} className="flex-1 py-2 border rounded-xl border-slate-600 hover:bg-slate-700 text-slate-300 transition-colors">取消</button><button onClick={confirmDeleteShopping} className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl shadow-lg">刪除</button></div></div>
+                        </div>
+                    )}
+
+                    {showClearOrphanedConfirm && (
+                        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in">
+                            <div className="bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center border border-slate-700">
+                                <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+                                    <Icons.Trash2 size={32} className="text-red-500" />
+                                </div>
+                                <h3 className="font-bold text-xl text-slate-100">確定清空殘留資料？</h3>
+                                <p className="text-slate-400 text-sm mt-2">這些資料屬於已被刪除的成員，清空後無法復原。</p>
+                                <div className="flex gap-3 mt-6">
+                                    <button onClick={() => setShowClearOrphanedConfirm(null)} className="flex-1 py-2.5 border rounded-xl border-slate-600 hover:bg-slate-700 text-slate-300 font-bold transition-colors">取消</button>
+                                    <button onClick={() => {
+                                        const validNames = members.map(m=>m.name);
+                                        if (showClearOrphanedConfirm === 'expenses') {
+                                            pushUpdate({ expenses: expenses.map(day => ({...day, items: day.items.filter(i => validNames.includes(i.payer))})).filter(day => day.items.length > 0) });
+                                        } else if (showClearOrphanedConfirm === 'packing') {
+                                            pushUpdate({ packingList: packingList.filter(i => validNames.includes(i.owner) || i.owner === 'all') });
+                                        } else if (showClearOrphanedConfirm === 'shopping') {
+                                            pushUpdate({ shoppingItems: shoppingItems.filter(i => validNames.includes(i.requester)) });
+                                        }
+                                        setShowClearOrphanedConfirm(null);
+                                        showMsg('✅ 殘留資料已全部清空！');
+                                    }} className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg transition-colors">確定清空</button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
