@@ -612,7 +612,7 @@
 
             const pushUpdate = (data) => {
                 window.FirebaseSDK.updateDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), JSON.parse(JSON.stringify(data)))
-                .catch(err => { if (err.message.includes('exceeds the maximum')) showMsg('❌ 儲存失敗：圖片容量過大，請刪除部分照片或壓縮'); else showMsg('❌ 同步失敗，請檢查網路連線'); });
+                .catch(err => { if (err.message.includes('exceeds the maximum')) showMsg('❌ 儲存失敗：此行程的總容量已達 1MB 上限！請刪除幾張舊照片釋放空間'); else showMsg('❌ 同步失敗，請檢查網路連線'); });
             };
             const showMsg = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
             const activeDayData = useMemo(() => trip.days?.find(d => d.id === activeDayId) || trip.days?.[0], [trip, activeDayId]);
@@ -620,45 +620,51 @@
 
             const compressImageToUnder1MB = (img, isAvatar = false) => {
                 const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-                let width = img.width, height = img.height;
+                let oW = img.width, oH = img.height;
                 
                 ctx.imageSmoothingEnabled = true; 
                 ctx.imageSmoothingQuality = 'high';
 
                 if (isAvatar) {
-                    const size = Math.min(width, height);
+                    const size = Math.min(oW, oH);
                     canvas.width = 150; canvas.height = 150;
-                    ctx.drawImage(img, (width - size) / 2, (height - size) / 2, size, size, 0, 0, 150, 150);
+                    ctx.drawImage(img, (oW - size) / 2, (oH - size) / 2, size, size, 0, 0, 150, 150);
                     let url = canvas.toDataURL('image/webp', 0.6);
                     if (url.startsWith('data:image/png')) url = canvas.toDataURL('image/jpeg', 0.6);
                     return url;
                 }
                 
-                // 極致微縮：將最大邊長限制在 400px，適合預覽小圖，大幅度降低基礎容量
-                const maxSize = 400; 
-                if (width > height && width > maxSize) { height = Math.round(height * maxSize / width); width = maxSize; }
-                else if (height > maxSize) { width = Math.round(width * maxSize / height); height = maxSize; }
-                
-                canvas.width = width; canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
-                
+                let targetSize = 400; // 初始目標尺寸
                 let quality = 0.6;
-                // 優先使用 WebP 黑科技
                 let format = 'image/webp';
-                let dataUrl = canvas.toDataURL(format, quality);
                 
-                // 【關鍵防禦】部分設備不支援 WebP，會強制輸出肥大的 PNG，此時立刻切換回 JPEG 保命
-                if (dataUrl.startsWith('data:image/png')) {
-                    format = 'image/jpeg';
-                    dataUrl = canvas.toDataURL(format, quality);
+                // 建立一個渲染函數，方便重複測試壓縮
+                const render = (s, q) => {
+                    let w = oW, h = oH;
+                    if (w > h && w > s) { h = Math.round(h * s / w); w = s; }
+                    else if (h > s) { w = Math.round(w * s / h); h = s; }
+                    canvas.width = w; canvas.height = h;
+                    ctx.clearRect(0, 0, w, h);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    let res = canvas.toDataURL(format, q);
+                    // iOS 防禦：如果不支援 webp 導致輸出 png，切換回 jpeg
+                    if (res.startsWith('data:image/png')) { format = 'image/jpeg'; res = canvas.toDataURL(format, q); }
+                    return res;
+                };
+
+                let dataUrl = render(targetSize, quality);
+                const maxLen = 30000; // 安全上限約 25KB
+
+                // 階段一：慢慢降低畫質
+                while (dataUrl.length > maxLen && quality > 0.1) {
+                    quality -= 0.15;
+                    dataUrl = render(targetSize, Math.max(0.1, quality));
                 }
-                
-                // 強制將單張圖片的容量壓低至約 25KB 以內
-                // 這樣一個大行程檔案即使放了 30 張圖，也不會超過 Firebase 1MB (約 1,300,000 字元) 的限制
-                const maxLen = 30000; 
-                while (dataUrl.length > maxLen && quality > 0.05) {
-                    quality -= 0.1;
-                    dataUrl = canvas.toDataURL(format, quality);
+
+                // 階段二：降維打擊！專治竹編這類高頻細節圖 (若畫質降到極限還太大，就縮小尺寸)
+                while (dataUrl.length > maxLen && targetSize > 150) {
+                    targetSize -= 50;
+                    dataUrl = render(targetSize, Math.max(0.1, quality));
                 }
                 
                 return dataUrl;
