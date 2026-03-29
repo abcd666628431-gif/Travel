@@ -196,6 +196,24 @@
             return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
         };
 
+        const formatStayTime = (stayTime) => {
+            const hrs = parseFloat(stayTime !== undefined && stayTime !== '' ? stayTime : 1);
+            const h = Math.floor(hrs);
+            const m = Math.round((hrs - h) * 60);
+            if (h > 0 && m > 0) return `${h} 小時 ${m} 分`;
+            if (h > 0) return `${h} 小時`;
+            return `${m} 分鐘`;
+        };
+
+        const formatStayTimeShort = (stayTime) => {
+            const hrs = parseFloat(stayTime !== undefined && stayTime !== '' ? stayTime : 1);
+            const h = Math.floor(hrs);
+            const m = Math.round((hrs - h) * 60);
+            if (h > 0 && m > 0) return `${h}h ${m}m`;
+            if (h > 0) return `${h}h`;
+            return `${m}m`;
+        };
+
         const formatShortDate = (dateStr) => {
             if (!dateStr) return '';
             const parts = dateStr.split(' ')[0].split('/');
@@ -472,6 +490,36 @@
             const handleBlur = () => { const trimmed = title.trim(); if (!trimmed) { setTitle(day?.title || '新的一天'); } else if (trimmed !== day?.title) { onUpdate(day.id, trimmed); } };
             const handleKeyDown = (e) => { if (e.key === 'Enter') e.target.blur(); };
             return (<input type="text" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleBlur} onKeyDown={handleKeyDown} className="font-bold text-blue-400 text-sm md:text-base bg-transparent outline-none w-full focus:bg-slate-900 focus:px-2 -ml-2 md:-ml-1 px-2 md:px-1 py-0.5 md:py-1 rounded transition-all border border-transparent focus:border-blue-500/50" placeholder="輸入天數名稱..." />);
+        });
+
+        const StayTimeInput = React.memo(({ value, onChange }) => {
+            const valNum = parseFloat(value !== undefined && value !== '' ? value : 1);
+            const h = isNaN(valNum) ? 0 : Math.floor(valNum);
+            const m = isNaN(valNum) ? 0 : Math.round((valNum - h) * 60);
+
+            const handleH = (e) => {
+                const newH = parseInt(e.target.value || 0, 10);
+                onChange(String(newH + m / 60));
+            };
+            const handleM = (e) => {
+                let newM = parseInt(e.target.value || 0, 10);
+                if (newM > 59) newM = 59;
+                if (newM < 0) newM = 0;
+                onChange(String(h + newM / 60));
+            };
+
+            return (
+                <div className="flex gap-2 h-[38px]">
+                    <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-2 flex-1 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all overflow-hidden">
+                        <input type="number" min="0" value={h.toString()} onChange={handleH} onClick={(e) => e.target.select()} className="w-full bg-transparent text-slate-100 outline-none text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="text-xs text-slate-400 font-bold shrink-0 select-none">時</span>
+                    </div>
+                    <div className="flex items-center bg-slate-900 border border-slate-700 rounded-lg px-2 flex-1 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all overflow-hidden">
+                        <input type="number" min="0" max="59" value={m.toString()} onChange={handleM} onClick={(e) => e.target.select()} className="w-full bg-transparent text-slate-100 outline-none text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                        <span className="text-xs text-slate-400 font-bold shrink-0 select-none">分</span>
+                    </div>
+                </div>
+            );
         });
 
         const TripPlanner = ({ tripId, onBack, db, appId, user }) => {
@@ -1094,7 +1142,7 @@
                                                                         <div className="flex-1 pb-3">
                                                                             <div className={`flex items-stretch overflow-hidden rounded-xl border border-slate-700 bg-slate-800/90 transition-all ${hoveredPlaceId === p.id ? 'border-blue-500 shadow-xl' : ''}`} onMouseEnter={() => setHoveredPlaceId(p.id)} onMouseLeave={() => setHoveredPlaceId(null)}>
                                                                                 <div className="w-[85px] sm:w-[120px] bg-slate-700/50 shrink-0 relative cursor-pointer overflow-hidden group/img flex items-center justify-center" onClick={() => p.image && setPreviewImage(p.image)}>{p.image ? (<img src={p.image} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-300 pointer-events-none" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={24} /></div>)}{p.image && <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
-                                                                                <div className="flex-1 min-w-0 relative p-2"><div className="flex justify-between items-start"><div className="flex flex-col"><div className="flex items-start gap-0.5">{p.note && (<button onClick={(e) => toggleNote(p.id, e)} className="mt-0.5 text-slate-400 hover:text-blue-400 transition-colors shrink-0 outline-none">{isNoteExpanded ? <Icons.ChevronUp size={16} /> : <Icons.ChevronDown size={16} />}</button>)}<h3 className={`font-bold text-slate-100 text-sm md:text-base leading-snug ${isNoteExpanded ? '' : 'line-clamp-2'}`}>{p.name}</h3></div>{p.note && isNoteExpanded && (<div className="mt-1.5 ml-4 text-xs md:text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledId(p.id)} onTouchStart={() => setDragEnabledId(p.id)} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg cursor-grab active:cursor-grabbing transition-colors"><Icons.GripVertical size={16} /></div><button onClick={() => { saveListScroll(); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setPanelMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><Icons.MoreVertical size={16} /></button></div></div><div className={`text-[10px] md:text-[11px] text-slate-400 mt-1 ${p.note ? 'ml-4' : ''}`}>停留 {p.stayTime || '1'} 小時</div><div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${p.note ? 'ml-4' : ''}`}><span className="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span></div></div>
+                                                                                <div className="flex-1 min-w-0 relative p-2"><div className="flex justify-between items-start"><div className="flex flex-col"><div className="flex items-start gap-0.5">{p.note && (<button onClick={(e) => toggleNote(p.id, e)} className="mt-0.5 text-slate-400 hover:text-blue-400 transition-colors shrink-0 outline-none">{isNoteExpanded ? <Icons.ChevronUp size={16} /> : <Icons.ChevronDown size={16} />}</button>)}<h3 className={`font-bold text-slate-100 text-sm md:text-base leading-snug ${isNoteExpanded ? '' : 'line-clamp-2'}`}>{p.name}</h3></div>{p.note && isNoteExpanded && (<div className="mt-1.5 ml-4 text-xs md:text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledId(p.id)} onTouchStart={() => setDragEnabledId(p.id)} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg cursor-grab active:cursor-grabbing transition-colors"><Icons.GripVertical size={16} /></div><button onClick={() => { saveListScroll(); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setPanelMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><Icons.MoreVertical size={16} /></button></div></div><div className={`text-[10px] md:text-[11px] text-slate-400 mt-1 ${p.note ? 'ml-4' : ''}`}>停留 {formatStayTime(p.stayTime)}</div><div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${p.note ? 'ml-4' : ''}`}><span className="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span></div></div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1155,8 +1203,8 @@
                                                             <input type="time" required value={newItem.time} onChange={e => setNewItem({...newItem, time: e.target.value})} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none text-sm" />
                                                         </div>
                                                         <div className="flex-1">
-                                                            <label className="block text-xs font-bold text-slate-400 mb-1">停留時間 (小時)</label>
-                                                            <input type="number" step="0.5" min="0" required value={newItem.stayTime} onChange={e => setNewItem({...newItem, stayTime: e.target.value})} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none text-sm" />
+                                                            <label className="block text-xs font-bold text-slate-400 mb-1">停留時間</label>
+                                                            <StayTimeInput value={newItem.stayTime} onChange={v => setNewItem({...newItem, stayTime: v})} />
                                                         </div>
                                                     </div>
                                                     <div>
@@ -1485,7 +1533,7 @@
                                                                                             <div className="w-[70px] sm:w-[80px] bg-slate-700/50 shrink-0 relative overflow-hidden flex items-center justify-center">{p.image ? (<img src={p.image} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={16} /></div>)}</div>
                                                                                             <div className="flex-1 min-w-0 relative p-2 md:p-2.5 flex flex-col justify-between">
                                                                                                 <div className="flex justify-between items-start gap-1"><div className="flex flex-col min-w-0"><h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>{p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} onClick={(e) => e.stopPropagation()} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={14} /></div><button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setModalMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="編輯景點"><Icons.MoreVertical size={14} /></button></div></div>
-                                                                                                <div className="flex items-center gap-1.5 mt-1 justify-between"><span className="px-1.5 py-0.5 rounded text-[9px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span><span className="text-[9px] text-slate-500 font-medium">停留 {p.stayTime || '1'}h</span></div>
+                                                                                                <div className="flex items-center gap-1.5 mt-1 justify-between"><span className="px-1.5 py-0.5 rounded text-[9px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span><span className="text-[9px] text-slate-500 font-medium">停留 {formatStayTimeShort(p.stayTime)}</span></div>
                                                                                             </div>
                                                                                         </div>
                                                                                     </div>
@@ -1664,8 +1712,8 @@
                                                 <input type="time" required value={newItem.time} onChange={e => setNewItem({...newItem, time: e.target.value})} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none text-sm" />
                                             </div>
                                             <div className="flex-1">
-                                                <label className="block text-xs font-bold text-slate-400 mb-1">停留時間 (小時)</label>
-                                                <input type="number" step="0.5" min="0" required value={newItem.stayTime} onChange={e => setNewItem({...newItem, stayTime: e.target.value})} className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none text-sm" />
+                                                <label className="block text-xs font-bold text-slate-400 mb-1">停留時間</label>
+                                                <StayTimeInput value={newItem.stayTime} onChange={v => setNewItem({...newItem, stayTime: v})} />
                                             </div>
                                         </div>
                                         <div>
