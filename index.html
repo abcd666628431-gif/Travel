@@ -1508,7 +1508,7 @@
                         
                         {activeTab === 'categories' && (
                             <div className="w-full h-full bg-slate-900 p-4 md:p-8 overflow-y-auto">
-                                <div className="max-w-7xl mx-auto space-y-8 pb-32">
+                                <div className="max-w-[1600px] mx-auto space-y-8 pb-32">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                                         <div className="flex items-center gap-3">
                                             <h2 className="text-2xl font-bold text-slate-100">行程總覽</h2>
@@ -1519,7 +1519,7 @@
                                             <button onClick={() => setOverviewMode('by_category')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${overviewMode === 'by_category' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>依分類</button>
                                         </div>
                                     </div>
-                                    
+
                                     {overviewMode === 'by_category' ? (
                                         categoryConfigs.map(cat => {
                                             const places = groupedPlaces[cat.type]; if (!places || places.length === 0) return null;
@@ -1539,11 +1539,11 @@
                                             );
                                         })
                                     ) : (
-                                        <div ref={overviewContainerRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 pb-8 items-start w-full">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6 pb-8 items-start w-full">
                                             {trip.days?.map((day, idx) => {
                                                 const places = day.places || [];
                                                 return (
-                                                    <div key={day.id} className="w-full flex flex-col animate-fade-in bg-slate-900/40 rounded-[2rem] border border-slate-800 p-3 shadow-lg h-full">
+                                                    <div key={day.id} className="flex flex-col animate-fade-in bg-slate-900/40 rounded-[2rem] border border-slate-800 p-4 shadow-lg w-full">
                                                         <div className="flex justify-between items-center bg-slate-800/80 p-3 rounded-xl mb-4 border border-slate-700 shadow-sm">
                                                             <div className="flex flex-col"><h3 className="font-bold text-base text-blue-400 tracking-wide">{day.title}</h3><div className="text-[10px] text-slate-400 mt-0.5">{formatShortDate(day.date)} · {places.length} 個景點</div></div>
                                                             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-black shadow-lg shadow-blue-900/50 text-sm border-2 border-slate-800">D{idx + 1}</div>
@@ -1588,7 +1588,7 @@
                                                             )}
                                                             <div onDragOver={(e) => { e.preventDefault(); setDragOverOverview({ dayId: day.id, index: places.length }); }} onDrop={(e) => { handleOverviewDrop(e, day.id, places.length); setDragOverOverview(null); }} className={`flex-1 min-h-[60px] rounded-xl border-2 border-dashed transition-all flex items-center justify-center ${dragOverOverview?.dayId === day.id && dragOverOverview?.index === places.length ? 'h-16 mt-2 border-blue-400 bg-blue-500/10 opacity-100' : (draggedOverviewPlace ? 'h-10 mt-2 border-transparent opacity-0' : 'h-0 m-0 border-transparent opacity-0 pointer-events-none overflow-hidden')}`}><span className="text-xs font-bold text-blue-400 bg-blue-900/40 px-3 py-1 rounded-full">移至尾端</span></div>
                                                         </div>
-                                                        <button onClick={() => { setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); setModalMode('add'); }} className="w-full py-3 mt-3 border-2 border-dashed border-slate-700/50 rounded-xl text-slate-500 font-bold hover:border-blue-500 hover:text-blue-400 hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"><Icons.Plus size={16} /> 新增行程景點</button>
+                                                        <button onClick={() => { setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); setModalMode('add'); }} className="w-full py-3 mt-4 border-2 border-dashed border-slate-700/50 rounded-xl text-slate-500 font-bold hover:border-blue-500 hover:text-blue-400 hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"><Icons.Plus size={16} /> 新增行程景點</button>
                                                     </div>
                                                 );
                                             })}
