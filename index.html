@@ -56,6 +56,10 @@
         .styled-scrollbar::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
         .styled-scrollbar { scrollbar-width: thin; scrollbar-color: #4b5563 #1e293b; }
         .dark-map-tiles .leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(110%) grayscale(20%); }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        .custom-route-popup .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); border: 1px solid #e2e8f0; overflow: hidden; }
+        .custom-route-popup .leaflet-popup-content { margin: 0; }
     </style>
 </head>
 <body>
@@ -193,43 +197,48 @@
 
         const getRealTransitPopupHtml = (p1, p2, transit, travelInfo, travelMode) => {
             const totalMins = Math.ceil(transit.duration / 60);
-            const costStr = transit.cost && parseFloat(transit.cost) > 0 ? `<span class="text-xs font-bold text-slate-500 ml-2">約 ¥${transit.cost}</span>` : '';
+            const costStr = transit.cost && parseFloat(transit.cost) > 0 ? `<span class="text-xs font-bold text-slate-500 ml-2 border border-slate-200 px-1.5 py-0.5 rounded bg-slate-50">約 ¥${transit.cost}</span>` : '';
             const distKm = (transit.distance / 1000).toFixed(1);
             
-            const modeIcon = travelMode === 'bus' ? '🚌' : '🚇';
-            const modeTitle = travelMode === 'bus' ? '高德公車/大眾運輸' : '高德只有地鐵路線';
-            const timeColor = travelMode === 'bus' ? 'text-sky-500' : 'text-purple-600';
+            const isSubwayMode = travelMode === 'subway';
+            const modeIcon = isSubwayMode ? '🚇' : '🚌';
+            const timeColor = isSubwayMode ? 'text-purple-600' : 'text-sky-500';
             
             let html = `
-            <div class="w-[280px] font-sans text-slate-800 p-1 max-h-[350px] overflow-y-auto no-scrollbar styled-scrollbar">
-                <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-200 sticky top-0 bg-white z-20">
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-lg">${modeIcon}</span><span class="text-sm font-bold text-slate-800">${modeTitle}</span>
+            <div class="w-[320px] font-sans text-slate-800 bg-white max-h-[450px] overflow-y-auto styled-scrollbar">
+                <!-- Header (Google Maps Style) -->
+                <div class="p-3.5 border-b border-slate-200 sticky top-0 bg-white z-20 shadow-sm flex justify-between items-center">
+                    <div class="flex flex-col">
+                        <h1 class="text-[22px] font-bold ${timeColor}">${totalMins > 60 ? Math.floor(totalMins/60)+'小時'+totalMins%60+'分' : totalMins+'分'}</h1>
+                        <span class="text-xs text-slate-500 mt-0.5 font-medium">總距離: ${distKm} km ${costStr}</span>
                     </div>
-                    <div class="text-lg font-black ${timeColor} drop-shadow-sm">${totalMins > 60 ? Math.floor(totalMins/60)+'小時'+totalMins%60+'分' : totalMins+'分'}</div>
+                    <span class="text-2xl">${modeIcon}</span>
                 </div>
-                <div class="relative ml-2 pt-1 pb-2">
-                    <div class="flex gap-3 mb-4 relative">
-                        <div class="flex flex-col items-center w-4 shrink-0 relative z-10">
-                            <div class="w-2.5 h-2.5 rounded-full border-[2.5px] border-slate-400 bg-white z-10 mt-1"></div>
+
+                <div class="px-5 py-4 relative">
+                    <!-- Start Point -->
+                    <div class="flex items-start gap-4 mb-1">
+                        <div class="flex flex-col items-center mt-1 relative z-10 w-4">
+                            <div class="w-3.5 h-3.5 rounded-full border-[2.5px] border-slate-400 bg-white"></div>
                             <div class="w-[2px] h-full border-l-2 border-dotted border-slate-400 absolute top-3"></div>
                         </div>
-                        <div class="flex-1 pb-1">
-                            <div class="font-bold text-[13px] text-slate-800 leading-tight truncate" title="${p1.name}">${p1.name}</div>
+                        <div class="flex-1 pb-4">
+                            <div class="font-bold text-base text-slate-800 leading-snug">${p1.name}</div>
                         </div>
                     </div>
             `;
 
             transit.segments.forEach((seg, idx) => {
+                // Walking Segment
                 if (seg.walking && parseInt(seg.walking.distance) > 0) {
                     const walkMins = Math.ceil(seg.walking.duration / 60);
                     html += `
-                        <div class="flex gap-3 mb-4 relative">
-                            <div class="flex flex-col items-center w-4 shrink-0 relative z-10">
+                        <div class="flex items-start gap-4 mb-1">
+                            <div class="flex flex-col items-center w-4 relative z-10">
                                 <div class="w-[2px] h-full border-l-2 border-dotted border-slate-400 absolute -top-4"></div>
                             </div>
-                            <div class="flex-1 -mt-3 pb-1">
-                                <div class="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium bg-slate-50 w-max px-2 py-1 rounded">
+                            <div class="flex-1 -mt-4 pb-5">
+                                <div class="flex items-center gap-1.5 text-sm text-slate-600 font-medium">
                                     <span>🚶</span> 步行 ${walkMins} 分鐘 (${seg.walking.distance}m)
                                 </div>
                             </div>
@@ -237,54 +246,107 @@
                     `;
                 }
 
+                // Transit Segment (Bus / Subway)
                 if (seg.bus && seg.bus.buslines && seg.bus.buslines.length > 0) {
                     const bus = seg.bus.buslines[0];
                     const isMetro = bus.type && (bus.type.includes('地铁') || bus.type.includes('地鐵') || bus.type.includes('轻轨') || bus.type.includes('捷运') || bus.type.includes('磁悬浮'));
                     const icon = isMetro ? '🚇' : '🚌';
-                    const color = isMetro ? '#8b5cf6' : '#0ea5e9';
+                    
+                    // Generate a deterministic color based on line name to mimic real metro line colors
+                    const cIdx = (bus.name.charCodeAt(0) || 0) % 7;
+                    const colors = ['#ef4444', '#f59e0b', '#10b981', '#0ea5e9', '#6366f1', '#d946ef', '#14b8a6'];
+                    const lineColor = isMetro ? colors[cIdx] : '#3b82f6';
                     const lineName = bus.name.split('(')[0];
-                    const stops = bus.via_num ? `經過 ${bus.via_num} 站` : '';
                     const duration = Math.ceil(bus.duration / 60);
+                    const stops = bus.via_stops || [];
                     
                     html += `
-                        <div class="flex gap-3 mb-1 relative">
-                            <div class="flex flex-col items-center w-4 shrink-0 relative z-10">
-                                <div class="w-3.5 h-3.5 rounded-full border-[3px] border-white z-10 shadow-sm mt-0.5" style="background-color: ${color}"></div>
-                                <div class="w-[4px] h-full absolute top-2.5" style="background-color: ${color}"></div>
+                        <!-- Boarding Station -->
+                        <div class="flex items-start gap-4 mb-0 relative">
+                            <div class="flex flex-col items-center w-4 shrink-0 relative z-10 mt-1">
+                                <div class="w-[18px] h-[18px] rounded-full border-[4px] border-white shadow-[0_0_2px_rgba(0,0,0,0.4)] z-10" style="background-color: ${lineColor}"></div>
+                                <div class="w-[5px] h-[calc(100%+16px)] absolute top-4" style="background-color: ${lineColor}"></div>
                             </div>
-                            <div class="flex-1 pb-1">
-                                <div class="font-bold text-[13px] text-slate-800 leading-tight">${bus.departure_stop.name}</div>
-                                <div class="flex flex-col gap-1 mt-1.5 mb-1.5">
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="px-1.5 py-0.5 text-white text-[10px] font-bold rounded shadow-sm" style="background-color: ${color}">${icon} ${lineName}</span>
+                            <div class="flex-1 pb-2">
+                                <div class="font-bold text-base text-slate-800 leading-tight">${bus.departure_stop.name}</div>
+                                <div class="flex flex-col gap-1 mt-2 mb-1">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="px-2 py-0.5 text-white text-xs font-bold rounded shadow-sm" style="background-color: ${lineColor}">${icon} ${lineName}</span>
                                     </div>
-                                    <span class="text-[10px] text-slate-600 font-medium ml-1">往 ${bus.arrival_stop.name} 方向</span>
+                                    <span class="text-sm text-slate-600 font-medium">往 ${bus.arrival_stop.name} 方向</span>
                                 </div>
-                                <div class="text-[10px] text-slate-500 mb-3 ml-1">乘坐 ${duration} 分鐘 ${stops ? `(${stops})` : ''}</div>
                             </div>
                         </div>
-                        <div class="flex gap-3 mb-4 relative">
+                    `;
+
+                    // Stops Details (Collapsible like Google Maps)
+                    html += `
+                        <div class="flex items-start gap-4 mb-0 relative">
                             <div class="flex flex-col items-center w-4 shrink-0 relative z-10">
-                                <div class="w-3.5 h-3.5 rounded-full border-[3px] border-white z-10 shadow-sm mt-0.5" style="background-color: ${color}"></div>
-                                <div class="w-[2px] h-full border-l-2 border-dotted border-slate-400 absolute top-2.5"></div>
+                                <div class="w-[5px] h-full absolute top-0 bottom-0" style="background-color: ${lineColor}"></div>
                             </div>
-                            <div class="flex-1">
-                                <div class="font-bold text-[13px] text-slate-800 leading-tight">${bus.arrival_stop.name}</div>
+                            <div class="flex-1 pb-4 z-20">
+                    `;
+
+                    if (stops.length > 0) {
+                        html += `
+                                <details class="group bg-white rounded-lg border border-slate-200 overflow-hidden mt-1 shadow-sm">
+                                    <summary class="list-none cursor-pointer flex items-center justify-between text-xs text-slate-600 px-3 py-2.5 select-none hover:bg-slate-50 transition-colors">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="font-bold text-slate-700 text-sm">${duration} 分鐘</span>
+                                            <span class="text-sm">(${bus.via_num} 站)</span>
+                                        </div>
+                                        <span class="transform group-open:rotate-180 transition-transform duration-200 text-xs text-slate-400">▼</span>
+                                    </summary>
+                                    <div class="pl-4 py-2 border-t border-slate-100 bg-slate-50">
+                                        <div class="border-l-[3px] border-slate-300 ml-1.5 space-y-3 pb-2 pt-2">
+                        `;
+                        stops.forEach(stop => {
+                            html += `
+                                            <div class="text-xs text-slate-700 relative pl-4 font-medium">
+                                                <span class="absolute -left-[5px] top-[3px] w-2 h-2 rounded-full bg-slate-300 border-[1.5px] border-slate-50"></span>
+                                                ${stop.name}
+                                            </div>
+                            `;
+                        });
+                        html += `
+                                        </div>
+                                    </div>
+                                </details>
+                        `;
+                    } else {
+                        html += `<div class="text-sm text-slate-700 font-bold px-1 py-1 mt-1">${duration} 分鐘 ${bus.via_num ? '<span class="text-slate-500 font-normal">('+bus.via_num+' 站)</span>' : ''}</div>`;
+                    }
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+
+                    // Alighting Station
+                    html += `
+                        <div class="flex items-start gap-4 mb-1 relative">
+                            <div class="flex flex-col items-center w-4 shrink-0 relative z-10 mt-1">
+                                <div class="w-[18px] h-[18px] rounded-full border-[4px] border-white shadow-[0_0_2px_rgba(0,0,0,0.4)] z-10" style="background-color: ${lineColor}"></div>
+                                ${idx !== transit.segments.length - 1 ? `<div class="w-[2px] h-[calc(100%+16px)] border-l-2 border-dotted border-slate-400 absolute top-4"></div>` : ''}
+                            </div>
+                            <div class="flex-1 pb-4">
+                                <div class="font-bold text-base text-slate-800 leading-tight">${bus.arrival_stop.name}</div>
                             </div>
                         </div>
                     `;
                 }
             });
 
+            // Final Destination
             html += `
-                    <div class="flex gap-3 relative">
-                        <div class="flex flex-col items-center w-4 shrink-0 relative z-10">
-                            <div class="w-[2px] h-4 border-l-2 border-dotted border-slate-400 absolute -top-4"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm mt-1"></div>
+                    <div class="flex items-start gap-4 relative">
+                        <div class="flex flex-col items-center w-4 shrink-0 relative z-10 mt-1">
+                            <div class="w-[2px] h-4 border-l-2 border-dotted border-slate-400 absolute -top-5"></div>
+                            <div class="w-[14px] h-[14px] rounded-full bg-red-500 shadow-sm border-2 border-white relative z-10"></div>
                         </div>
                         <div class="flex-1">
-                            <div class="font-bold text-[13px] text-slate-800 leading-tight truncate" title="${p2.name}">${p2.name}</div>
-                            <div class="text-[10px] text-slate-400 mt-1 font-mono">總距離: ${distKm} km ${costStr}</div>
+                            <div class="font-bold text-base text-slate-800 leading-tight">${p2.name}</div>
                         </div>
                     </div>
                 </div>
@@ -479,10 +541,10 @@
                                     } else if (travelMode === 'subway' || travelMode === 'bus') {
                                         const [gLng1, gLat1] = wgs84togcj02(p1.lng, p1.lat);
                                         const [gLng2, gLat2] = wgs84togcj02(p2.lng, p2.lat);
-                                        const getCity = async (lng, lat) => { try { const res = await fetch(`https://restapi.amap.com/v3/geocode/regeo?key=3bf27a17038b433640ab774dafa1d0a6&location=${lng},${lat}`); const data = await res.json(); if (data.status === '1') { const ac = data.regeocode.addressComponent; return ac.city && ac.city.length > 0 ? ac.city : ac.province; } } catch(e) {} return '全国'; };
-                                        const c1 = await getCity(gLng1, gLat1); const c2 = await getCity(gLng2, gLat2);
+                                        const getCityAdcode = async (lng, lat) => { try { const res = await fetch(`https://restapi.amap.com/v3/geocode/regeo?key=3bf27a17038b433640ab774dafa1d0a6&location=${lng},${lat}`); const data = await res.json(); if (data.status === '1') { return data.regeocode.addressComponent.adcode || data.regeocode.addressComponent.citycode; } } catch(e) {} return '全国'; };
+                                        const c1 = await getCityAdcode(gLng1, gLat1); const c2 = await getCityAdcode(gLng2, gLat2);
                                         const strategy = travelMode === 'bus' ? 5 : 0; // 5: 不乘地鐵, 0: 最快捷(優先推薦地鐵)
-                                        const url = `https://restapi.amap.com/v3/direction/transit/integrated?key=3bf27a17038b433640ab774dafa1d0a6&origin=${gLng1},${gLat1}&destination=${gLng2},${gLat2}&city=${encodeURIComponent(c1)}&cityd=${encodeURIComponent(c2)}&strategy=${strategy}`;
+                                        const url = `https://restapi.amap.com/v3/direction/transit/integrated?key=3bf27a17038b433640ab774dafa1d0a6&origin=${gLng1},${gLat1}&destination=${gLng2},${gLat2}&city=${c1}&cityd=${c2}&strategy=${strategy}`;
                                         try { 
                                             const res = await fetch(url); 
                                             const data = await res.json(); 
