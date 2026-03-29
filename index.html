@@ -56,8 +56,6 @@
         .styled-scrollbar::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
         .styled-scrollbar { scrollbar-width: thin; scrollbar-color: #4b5563 #1e293b; }
         .dark-map-tiles .leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(110%) grayscale(20%); }
-        .custom-route-popup .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); border: 1px solid #e2e8f0; }
-        .custom-route-popup .leaflet-popup-content { margin: 10px 12px; }
     </style>
 </head>
 <body>
@@ -327,7 +325,7 @@
                 if (mapDataHashRef.current === currentHash) return; mapDataHashRef.current = currentHash;
 
                 Object.keys(markersRef.current).forEach(id => { if (map.hasLayer(markersRef.current[id].marker)) { map.removeLayer(markersRef.current[id].marker); } delete markersRef.current[id]; });
-                Object.keys(routeLayersRef.current).forEach(key => { const layers = routeLayersRef.current[key]; if (layers.outline && map.hasLayer(layers.outline)) map.removeLayer(layers.outline); if (layers.main && map.hasLayer(layers.main)) map.removeLayer(layers.main); if (layers.flow && map.hasLayer(layers.flow)) map.removeLayer(layers.flow); if (layers.clickArea && map.hasLayer(layers.clickArea)) map.removeLayer(layers.clickArea); if (layers.alts) { layers.alts.forEach(altLayer => { if (map.hasLayer(altLayer)) map.removeLayer(altLayer); }); } delete routeLayersRef.current[key]; });
+                Object.keys(routeLayersRef.current).forEach(key => { const layers = routeLayersRef.current[key]; if (layers.outline && map.hasLayer(layers.outline)) map.removeLayer(layers.outline); if (layers.main && map.hasLayer(layers.main)) map.removeLayer(layers.main); if (layers.flow && map.hasLayer(layers.flow)) map.removeLayer(layers.flow); if (layers.alts) { layers.alts.forEach(altLayer => { if (map.hasLayer(altLayer)) map.removeLayer(altLayer); }); } delete routeLayersRef.current[key]; });
 
                 if (validPlaces.length > 0) {
                     const posCounter = {}; const offsetStep = 0.0002;
@@ -363,29 +361,17 @@
                                 const isTransit = travelMode === 'transit'; const isWalk = travelMode === 'walk';
                                 const currentMainColor = isTransit ? '#a855f7' : (isWalk ? '#10b981' : routeColor);
                                 const mainStyle = { color: currentMainColor, weight: 8, opacity: 1, lineCap: 'round', lineJoin: 'round', dashArray: isTransit ? '10, 10' : null };
-                                const invisibleClickStyle = { color: 'transparent', weight: 30, opacity: 0, lineCap: 'round', lineJoin: 'round' };
-                                
                                 if (geometries.length > 1) { geometries.forEach((geo, idx) => { if (idx === validIndex || geo === 'straight_line') return; const altStyle = { color: '#94a3b8', weight: 6, opacity: 0.8, lineCap: 'round', lineJoin: 'round', dashArray: '5, 10' }; const clickStyle = { color: 'transparent', weight: 20, opacity: 0 }; const geoGCJ = JSON.parse(JSON.stringify(geo)); if(geoGCJ.coordinates) { geoGCJ.coordinates = geoGCJ.coordinates.map(c => wgs84togcj02(c[0], c[1])); } const altMain = L.geoJSON(geoGCJ, { style: altStyle }).addTo(mapInstanceRef.current); const altClick = L.geoJSON(geoGCJ, { style: clickStyle }).addTo(mapInstanceRef.current); altClick.on('click', () => { if (onRouteAltSelect) onRouteAltSelect(p1.id, idx); }); altClick.on('mouseover', () => { altMain.setStyle({ color: '#cbd5e1', weight: 8, cursor: 'pointer' }); if (altMain.bringToFront) altMain.bringToFront(); }); altClick.on('mouseout', () => altMain.setStyle(altStyle)); alts.push(altMain, altClick); }); }
-                                
                                 const mainGeo = geometries[validIndex];
-                                let clickArea;
-                                const travelInfo = calculateTravelInfo(p1, p2);
-                                const popupHtml = `<div class="min-w-[160px] font-sans"><div class="flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-200"><span class="text-lg leading-none">${isTransit ? '🚇' : (isWalk ? '🚶' : (travelMode==='straight'?'➖':'🚗'))}</span><span class="font-bold text-slate-700 text-sm">${isTransit ? '大眾運輸建議 (地鐵/公車)' : (isWalk ? '步行導航' : (travelMode==='straight'?'直線連接':'開車導航'))}</span></div><div class="flex flex-col gap-1.5 mb-2.5"><div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-blue-500 shadow-sm"></div><span class="text-xs text-slate-600 font-bold truncate max-w-[140px]">${p1.name}</span></div><div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-red-500 shadow-sm"></div><span class="text-xs text-slate-600 font-bold truncate max-w-[140px]">${p2.name}</span></div></div><div class="bg-slate-100 p-2 rounded-lg flex justify-between items-center border border-slate-200"><span class="text-xs text-slate-500 font-bold">預估時間</span><span class="text-base font-black ${isTransit ? 'text-purple-600' : (isWalk ? 'text-emerald-600' : 'text-blue-600')} drop-shadow-sm">${travelMode === 'straight' ? '--' : (isTransit ? travelInfo?.transit : (isWalk ? travelInfo?.walk : travelInfo?.drive))}</span></div><div class="text-[10px] text-slate-400 text-right mt-1.5 font-mono font-bold">參考距離: ${travelInfo?.dist.toFixed(1)} km</div></div>`;
-
                                 if (mainGeo === 'straight_line') {
                                     const [gLng1, gLat1] = wgs84togcj02(p1.lng, p1.lat); const [gLng2, gLat2] = wgs84togcj02(p2.lng, p2.lat); pathCoords = [[gLat1, gLng1], [gLat2, gLng2]]; const latlngs = [[gLat1, gLng1], [gLat2, gLng2]];
                                     outline = L.polyline(latlngs, outlineStyle).addTo(mapInstanceRef.current); main = L.polyline(latlngs, mainStyle).addTo(mapInstanceRef.current); flow = L.polyline(latlngs, { color: '#ffffff', weight: 4, className: 'route-flow-anim', opacity: 0 }).addTo(mapInstanceRef.current);
-                                    clickArea = L.polyline(latlngs, invisibleClickStyle).addTo(mapInstanceRef.current);
                                 } else {
                                     const geoGCJ = JSON.parse(JSON.stringify(mainGeo)); if(geoGCJ.coordinates) { geoGCJ.coordinates = geoGCJ.coordinates.map(c => wgs84togcj02(c[0], c[1])); pathCoords = geoGCJ.coordinates.map(c => [c[1], c[0]]); }
                                     outline = L.geoJSON(geoGCJ, { style: outlineStyle }).addTo(mapInstanceRef.current); main = L.geoJSON(geoGCJ, { style: mainStyle }).addTo(mapInstanceRef.current); flow = L.geoJSON(geoGCJ, { style: { color: '#ffffff', weight: 4, className: 'route-flow-anim', opacity: 0 } }).addTo(mapInstanceRef.current);
-                                    clickArea = L.geoJSON(geoGCJ, { style: invisibleClickStyle }).addTo(mapInstanceRef.current);
                                 }
-                                
-                                clickArea.bindPopup(popupHtml, { closeButton: false, offset: [0, -5], className: 'custom-route-popup' });
-
-                                if (main.bringToFront) main.bringToFront(); if (flow.bringToFront) flow.bringToFront(); if (clickArea.bringToFront) clickArea.bringToFront();
-                                routeLayersRef.current[segmentKey] = { outline, main, flow, clickArea, alts, p1Id: p1.id, p2Id: p2.id, baseColor: currentMainColor, pathCoords };
+                                if (main.bringToFront) main.bringToFront(); if (flow.bringToFront) flow.bringToFront();
+                                routeLayersRef.current[segmentKey] = { outline, main, flow, alts, p1Id: p1.id, p2Id: p2.id, baseColor: currentMainColor, pathCoords };
                                 await new Promise(resolve => setTimeout(resolve, 30));
                             }
                         };
