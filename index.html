@@ -391,16 +391,6 @@
             const map = { food: '餐飲', shopping: '購物', transport: '交通', sight: '景點', accommodation: '住宿' }; return map[type] || '其他';
         };
 
-        // 新增：智慧辨識 Google Drive 連結並轉換為直連圖
-        const processImageUrl = (url) => {
-            if (!url) return null;
-            const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-            if (driveMatch && driveMatch[1]) {
-                return `https://drive.google.com/uc?id=${driveMatch[1]}`;
-            }
-            return url;
-        };
-
         const CategoryIconWithLabel = ({ type, size = 20 }) => {
             const baseClass = "rounded-full flex items-center justify-center shrink-0 shadow-sm";
             const style = { width: `${size*2}px`, height: `${size*2}px`, fontSize: `${size * 1.2}px` };
@@ -785,12 +775,13 @@
             const [expenses, setExpenses] = useState([]);
             const [shoppingItems, setShoppingItems] = useState([]);
             const [packingList, setPackingList] = useState([]);
+            const [images, setImages] = useState({}); // 新增：獨立圖庫狀態
             const AMAP_KEY = '3bf27a17038b433640ab774dafa1d0a6'; 
             
             const [activeTab, setActiveTab] = useState('itinerary'); 
             const [activeDayId, setActiveDayId] = useState(1);
-            const [panelMode, setPanelMode] = useState('list'); // 'list', 'add', 'edit'
-            const [modalMode, setModalMode] = useState('add'); // 'add', 'edit'
+            const [panelMode, setPanelMode] = useState('list'); 
+            const [modalMode, setModalMode] = useState('add'); 
             const [newItem, setNewItem] = useState({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null });
             const [tempMarker, setTempMarker] = useState(null);
             const [addressSuggestions, setAddressSuggestions] = useState([]);
@@ -863,6 +854,17 @@
             const saveListScroll = () => { const el = document.querySelector('.itinerary-list-container'); if (el) listScrollRef.current = el.scrollTop; };
             const restoreListScroll = () => { setTimeout(() => { const el = document.querySelector('.itinerary-list-container'); if (el) el.scrollTop = listScrollRef.current; }, 10); };
 
+            // 新增：訂閱獨立圖庫 (一千個籃子)
+            useEffect(() => {
+                if (!user || !tripId) return;
+                const imagesCol = window.FirebaseSDK.collection(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`);
+                return window.FirebaseSDK.onSnapshot(imagesCol, (snap) => {
+                    const imgDict = {};
+                    snap.docs.forEach(doc => { imgDict[doc.id] = doc.data().image; });
+                    setImages(imgDict);
+                });
+            }, [user, tripId, db, appId]);
+
             const handleJumpToPlace = (p) => {
                 setActiveTab('itinerary');
                 setActiveDayId(p.dayId);
@@ -934,8 +936,9 @@
                 return window.FirebaseSDK.onSnapshot(tripDocRef, (snap) => {
                     if (snap.exists()) {
                         const data = snap.data();
-                        
                         let needsHeal = false;
+                        const migrationPromises = []; // 遷移任務列
+
                         const seenIds = new Set();
                         if (data.trip && data.trip.days) {
                             data.trip.days.forEach(day => {
@@ -946,12 +949,18 @@
                                             needsHeal = true;
                                         }
                                         seenIds.add(p.id);
+                                        
+                                        // 核心邏輯：自動將舊圖遷移至新籃子！
+                                        if (p.image && p.image.startsWith('data:image')) {
+                                            migrationPromises.push(window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${p.id}`), { image: p.image }));
+                                            delete p.image; // 從主文件中徹底刪除，解除封印
+                                            needsHeal = true;
+                                        }
                                     });
                                 }
                             });
                         }
 
-                        // 幽靈掃蕩：自動修復殘留在「分攤名單(sharedBy)」中的無效成員，確保結算數學正確
                         if (data.expenses && data.members) {
                             const validNames = data.members.map(m => m.name);
                             data.expenses.forEach(day => {
@@ -960,31 +969,32 @@
                                         if (item.sharedBy && Array.isArray(item.sharedBy)) {
                                             const originalLen = item.sharedBy.length;
                                             const newSharedBy = item.sharedBy.filter(n => validNames.includes(n));
-                                            if (newSharedBy.length !== originalLen) {
-                                                item.sharedBy = newSharedBy;
-                                                needsHeal = true;
-                                            }
+                                            if (newSharedBy.length !== originalLen) { item.sharedBy = newSharedBy; needsHeal = true; }
                                         }
                                     });
                                 }
                             });
                         }
 
-                        if (needsHeal) { window.FirebaseSDK.updateDoc(tripDocRef, { trip: data.trip, expenses: data.expenses }).catch(console.error); }
+                        if (needsHeal) { 
+                            Promise.all(migrationPromises).then(() => {
+                                window.FirebaseSDK.updateDoc(tripDocRef, { trip: data.trip, expenses: data.expenses }).catch(console.error); 
+                            });
+                        }
 
                         if (data.trip) setTrip(data.trip); if (data.members) setMembers(data.members); if (data.expenses) setExpenses(data.expenses);
                         if (data.shoppingItems) setShoppingItems(data.shoppingItems); if (data.packingList) setPackingList(data.packingList);
                         if (!activeDayId && data.trip?.days?.length > 0) setActiveDayId(data.trip.days[0].id);
                     }
                 });
-            }, [user, tripId]);
+            }, [user, tripId, db, appId]);
 
             const pushUpdate = (data) => {
                 window.FirebaseSDK.updateDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), JSON.parse(JSON.stringify(data)))
                 .catch(err => { if (err.message.includes('exceeds the maximum')) showMsg('❌ 儲存失敗：此行程總容量已達 1MB！請點擊右上角「🧹空間瘦身」'); else showMsg('❌ 同步失敗，請檢查網路連線'); });
             };
 
-            // Promise-based async compression engine (學習自影片庫系統的高效能架構)
+            // Promise-based async compression engine (因為圖庫獨立，畫質強勢回歸 800px)
             const compressImageAsync = (dataUrlOrImg, isAvatar = false) => new Promise((resolve) => {
                 const process = (img) => {
                     const canvas = document.createElement('canvas'); 
@@ -998,12 +1008,11 @@
                         const size = Math.min(oW, oH);
                         canvas.width = 150; canvas.height = 150;
                         ctx.drawImage(img, (oW - size) / 2, (oH - size) / 2, size, size, 0, 0, 150, 150);
-                        let res = canvas.toDataURL('image/webp', 0.7);
-                        if (res.startsWith('data:image/png')) res = canvas.toDataURL('image/jpeg', 0.7);
+                        let res = canvas.toDataURL('image/webp', 0.8);
+                        if (res.startsWith('data:image/png')) res = canvas.toDataURL('image/jpeg', 0.8);
                         resolve(res);
                     } else {
-                        // 標準化為最高 800px 寬度，以獲得高畫質與低容量的最佳平衡
-                        let targetSize = 800; 
+                        let targetSize = 800; // 不再受限 1MB，大膽開放 800px 高清顯示
                         let w = oW, h = oH;
                         if (w > h && w > targetSize) { h = Math.round(h * targetSize / w); w = targetSize; }
                         else if (h > targetSize) { w = Math.round(w * targetSize / h); h = targetSize; }
@@ -1011,79 +1020,51 @@
                         canvas.width = w; canvas.height = h;
                         ctx.drawImage(img, 0, 0, w, h);
                         
-                        let quality = 0.7; 
-                        let res = canvas.toDataURL('image/webp', quality); // 優先轉碼為高壓縮 WebP 字串
-                        if (res.startsWith('data:image/png')) res = canvas.toDataURL('image/jpeg', quality); // iOS Safari 防禦機制
-                        
-                        // 動態保險機制：確保最終的 Base64 長度不會讓 Firestore 當機
-                        while (res.length > 50000 && quality > 0.3) {
-                            quality -= 0.1;
-                            res = canvas.toDataURL(res.startsWith('data:image/jpeg') ? 'image/jpeg' : 'image/webp', quality);
-                        }
-                        resolve(res);
+                        let res = canvas.toDataURL('image/webp', 0.8); 
+                        resolve(res.startsWith('data:image/png') ? canvas.toDataURL('image/jpeg', 0.8) : res);
                     }
                 };
 
                 if (typeof dataUrlOrImg === 'string') {
                     if (!dataUrlOrImg.startsWith('data:image')) { resolve(dataUrlOrImg); return; }
-                    const img = new Image();
-                    img.onload = () => process(img);
-                    img.onerror = () => resolve(dataUrlOrImg);
-                    img.src = dataUrlOrImg;
-                } else {
-                    process(dataUrlOrImg);
-                }
+                    const img = new Image(); img.onload = () => process(img); img.onerror = () => resolve(dataUrlOrImg); img.src = dataUrlOrImg;
+                } else { process(dataUrlOrImg); }
             });
 
             const handleOptimizeTrip = async () => {
-                showMsg('🔄 開始全面掃描並強力壓縮所有舊圖片 (這可能需要幾秒鐘)...');
-                let tripModified = false;
-                let membersModified = false;
-                let newDays = JSON.parse(JSON.stringify(trip.days || []));
-                let newMembers = JSON.parse(JSON.stringify(members || []));
+                showMsg('🔄 開始掃描並壓縮獨立圖片庫 (這可能需要幾秒鐘)...');
+                let originalTotalSize = 0; let newTotalSize = 0; let optimizedCount = 0;
 
-                let originalTotalSize = 0;
-                let newTotalSize = 0;
-
-                for (let d of newDays) {
-                    if(!d.places) continue;
-                    for (let p of d.places) {
-                        // 無差別掃描：不管大小，只要是舊的 Base64 就強迫丟進新的 WebP 引擎進行轉碼標準化
-                        if (p.image && p.image.startsWith('data:image')) { 
-                            const oldLen = p.image.length;
-                            originalTotalSize += oldLen;
-                            const newImg = await compressImageAsync(p.image, false);
-                            if (newImg.length < oldLen) {
-                                p.image = newImg;
-                                tripModified = true;
-                            }
-                            newTotalSize += p.image.length;
+                // 優化新籃子中的圖片
+                for (const [imgId, base64Str] of Object.entries(images)) {
+                    if (base64Str && base64Str.startsWith('data:image')) {
+                        const oldLen = base64Str.length; originalTotalSize += oldLen;
+                        const newImg = await compressImageAsync(base64Str, false);
+                        if (newImg.length < oldLen * 0.9) { 
+                            await window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, imgId), { image: newImg });
+                            optimizedCount++;
                         }
+                        newTotalSize += newImg.length < oldLen * 0.9 ? newImg.length : oldLen;
                     }
                 }
                 
+                // 優化留在主文件中的頭像
+                let membersModified = false; let newMembers = JSON.parse(JSON.stringify(members || []));
                 for (let m of newMembers) {
                     if (m.avatar && m.avatar.startsWith('data:image')) {
-                        const oldLen = m.avatar.length;
-                        originalTotalSize += oldLen;
+                        const oldLen = m.avatar.length; originalTotalSize += oldLen;
                         const newAvatar = await compressImageAsync(m.avatar, true);
-                        if (newAvatar.length < oldLen) {
-                            m.avatar = newAvatar;
-                            membersModified = true;
-                        }
+                        if (newAvatar.length < oldLen) { m.avatar = newAvatar; membersModified = true; }
                         newTotalSize += m.avatar.length;
                     }
                 }
+                if (membersModified) pushUpdate({ members: newMembers });
 
-                if (tripModified || membersModified) {
-                    const payload = {};
-                    if (tripModified) payload.trip = { ...trip, days: newDays };
-                    if (membersModified) payload.members = newMembers;
-                    pushUpdate(payload);
-                    const savedKB = Math.round((originalTotalSize - newTotalSize) / 1024);
-                    showMsg(`✅ 深度瘦身完成！共為您釋放了 ${savedKB} KB 的空間！`);
+                const savedKB = Math.round((originalTotalSize - newTotalSize) / 1024);
+                if (optimizedCount > 0 || membersModified) {
+                    showMsg(`✅ 獨立圖片瘦身完成！共優化 ${optimizedCount} 張景點圖，釋放 ${savedKB} KB 空間！`);
                 } else {
-                    showMsg('✅ 目前所有圖片已經是最佳壓縮狀態，無需再瘦身。');
+                    showMsg('✅ 目前所有圖片庫已經是最佳狀態，無需再瘦身。');
                 }
             };
 
@@ -1099,16 +1080,6 @@
                     const current = stateRef.current;
                     if (current.activeTab !== 'itinerary' && !current.showEditPlaceModal) return;
                     
-                    // 檢查是否貼上了純文字網址 (例如 Google Drive 連結)
-                    const pastedText = e.clipboardData?.getData('Text');
-                    if (pastedText && pastedText.startsWith('http')) {
-                        const processedUrl = processImageUrl(pastedText);
-                        if (current.panelMode === 'add' || current.panelMode === 'edit' || current.showEditPlaceModal) {
-                            setNewItem(prev => ({ ...prev, image: processedUrl })); showMsg(`✅ 已套用外部圖片連結 (零容量負擔)`);
-                        }
-                        return;
-                    }
-
                     const items = e.clipboardData?.items; if (!items) return;
                     let imageFile = null; for (let i = 0; i < items.length; i++) { if (items[i].type.indexOf('image') !== -1) { imageFile = items[i].getAsFile(); break; } }
                     if (imageFile) {
@@ -1117,18 +1088,18 @@
                             const dataUrl = await compressImageAsync(event.target.result, false);
                             const kbSize = Math.round(dataUrl.length / 1024);
                             if (current.panelMode === 'add' || current.panelMode === 'edit' || current.showEditPlaceModal) {
-                                setNewItem(prev => ({ ...prev, image: dataUrl })); showMsg(`✅ 圖片已貼上並壓縮為 Base64 字串 (${kbSize}KB)`);
+                                setNewItem(prev => ({ ...prev, image: dataUrl })); showMsg(`✅ 圖片已貼上 (${kbSize}KB)`);
                             } else if (current.hoveredPlaceId) {
-                                const targetPlace = current.trip.days.flatMap(d => d.places).find(p => p.id === current.hoveredPlaceId); const targetName = targetPlace?.name?.trim();
-                                const newDays = current.trip.days.map(d => ({ ...d, places: d.places.map(p => { if (p.id === current.hoveredPlaceId || (targetName && p.name?.trim() === targetName)) return { ...p, image: dataUrl }; return p; }) }));
-                                pushUpdate({ trip: { ...current.trip, days: newDays } }); showMsg(`✅ 圖片已同步並壓縮為 Base64 (${kbSize}KB)`);
+                                // 核心修改：直接寫入獨立籃子，不影響行程表主文件！
+                                window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${current.hoveredPlaceId}`), { image: dataUrl });
+                                showMsg(`✅ 圖片已瞬間存入專屬圖庫 (${kbSize}KB)`);
                             }
                         }; reader.readAsDataURL(imageFile);
                     }
                 };
                 document.addEventListener('paste', handleGlobalPaste);
                 return () => document.removeEventListener('paste', handleGlobalPaste);
-            }, []);
+            }, [db, appId, tripId]);
 
             const handleAddressInput = (e) => {
                 const val = e.target.value; setNewItem(p => ({...p, address: val}));
@@ -1156,7 +1127,7 @@
                     const dataUrl = await compressImageAsync(event.target.result, false);
                     const kbSize = Math.round(dataUrl.length / 1024);
                     setNewItem(prev => ({ ...prev, image: dataUrl }));
-                    showMsg(`✅ 圖片已自動轉碼壓縮為 Base64 字串 (${kbSize}KB)`);
+                    showMsg(`✅ 高清圖片處理完成 (${kbSize}KB)`);
                 };
                 reader.readAsDataURL(file);
                 e.target.value = '';
@@ -1164,23 +1135,50 @@
 
             const handleManualAddSubmit = (e) => {
                 e.preventDefault(); const lat = tempMarker ? tempMarker.lat : 22.5 + Math.random()*0.1; const lng = tempMarker ? tempMarker.lng : 114.1 + Math.random()*0.1;
-                const targetNameTrimmed = newItem.name.trim(); const existingPlaceWithImage = trip.days.flatMap(d => d.places).find(p => p.name?.trim() === targetNameTrimmed && p.image);
-                const imageToSave = newItem.image || (existingPlaceWithImage ? existingPlaceWithImage.image : null);
-                const newP = { ...newItem, id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5), lat, lng, travelMode: 'drive', routeIndex: 0, ...(imageToSave ? { image: imageToSave } : {}) };
-                let newDays = trip.days.map(d => ({ ...d, places: d.places.map(p => (p.name?.trim() === targetNameTrimmed ? { ...p, address: newItem.address || p.address, lat, lng, ...(imageToSave && !p.image ? { image: imageToSave } : {}) } : p)) }));
+                const targetNameTrimmed = newItem.name.trim(); 
+                
+                const newP = { ...newItem, id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5), lat, lng, travelMode: 'drive', routeIndex: 0 };
+                delete newP.image; // 確保主文件絕對不會混入 Base64
+                
+                let newDays = trip.days.map(d => ({ ...d, places: d.places.map(p => (p.name?.trim() === targetNameTrimmed ? { ...p, address: newItem.address || p.address, lat, lng } : p)) }));
                 const dayIndex = newDays.findIndex(d => d.id === activeDayId);
                 if (dayIndex !== -1) { newDays[dayIndex].places.push(newP); if (newDays[dayIndex].places.length > 1) { newDays[dayIndex].places = cascadeTimes(newDays[dayIndex].places, newDays[dayIndex].places.length - 2); } }
-                pushUpdate({ trip: { ...trip, days: newDays } }); setPanelMode('list'); setTempMarker(null); setShowEditPlaceModal(false); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
+                pushUpdate({ trip: { ...trip, days: newDays } }); 
+                
+                // 將圖片存入專屬籃子
+                if (newItem.image) { window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${newP.id}`), { image: newItem.image }); }
+                
+                setPanelMode('list'); setTempMarker(null); setShowEditPlaceModal(false); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
             };
 
             const handleEditSubmit = (e) => {
                 e.preventDefault(); const targetNameTrimmed = newItem.name.trim(); const lat = tempMarker ? tempMarker.lat : null; const lng = tempMarker ? tempMarker.lng : null;
-                const existingPlaceWithImage = trip.days.flatMap(d => d.places).find(p => p.id !== newItem.id && p.name?.trim() === targetNameTrimmed && p.image);
-                const imageToSave = newItem.image !== undefined ? newItem.image : (trip.days.flatMap(d => d.places).find(p => p.id === newItem.id)?.image || (existingPlaceWithImage ? existingPlaceWithImage.image : null));
                 const targetDayIndex = trip.days.findIndex(d => d.id === activeDayId); const currentPlaceIndex = targetDayIndex !== -1 ? trip.days[targetDayIndex].places.findIndex(p => p.id === newItem.id) : -1;
-                let newDays = trip.days.map(d => ({ ...d, places: d.places.map(p => { if (p.id === newItem.id) { return { ...p, name: newItem.name, note: newItem.note, type: newItem.type, time: newItem.time, stayTime: newItem.stayTime || '1', address: newItem.address || p.address, ...(lat ? { lat, lng } : {}), ...(imageToSave ? { image: imageToSave } : { image: null }) }; } else if (targetNameTrimmed !== '' && p.name?.trim() === targetNameTrimmed) { return { ...p, address: newItem.address || p.address, ...(lat ? { lat, lng } : {}), ...(imageToSave && !p.image ? { image: imageToSave } : {}) }; } return p; }) }));
+                
+                let newDays = trip.days.map(d => ({ ...d, places: d.places.map(p => { 
+                    if (p.id === newItem.id) { 
+                        const up = { ...p, name: newItem.name, note: newItem.note, type: newItem.type, time: newItem.time, stayTime: newItem.stayTime || '1', address: newItem.address || p.address, ...(lat ? { lat, lng } : {}) }; 
+                        delete up.image; return up;
+                    } else if (targetNameTrimmed !== '' && p.name?.trim() === targetNameTrimmed) { 
+                        const up = { ...p, address: newItem.address || p.address, ...(lat ? { lat, lng } : {}) }; 
+                        delete up.image; return up;
+                    } return p; 
+                }) }));
                 if (targetDayIndex !== -1 && currentPlaceIndex !== -1) { newDays[targetDayIndex].places = cascadeTimes(newDays[targetDayIndex].places, currentPlaceIndex); }
-                pushUpdate({ trip: { ...trip, days: newDays } }); setPanelMode('list'); setTempMarker(null); setShowEditPlaceModal(false); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
+                pushUpdate({ trip: { ...trip, days: newDays } }); 
+                
+                // 更新同名景點的圖庫 (如果原本沒圖的話)
+                trip.days.flatMap(d => d.places).forEach(p => {
+                    if (p.id !== newItem.id && targetNameTrimmed !== '' && p.name?.trim() === targetNameTrimmed && newItem.image && !images[`place_${p.id}`]) {
+                        window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${p.id}`), { image: newItem.image });
+                    }
+                });
+
+                // 管理主要圖庫狀態
+                if (newItem.image) { window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${newItem.id}`), { image: newItem.image }); } 
+                else if (newItem.image === null && images[`place_${newItem.id}`]) { window.FirebaseSDK.deleteDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${newItem.id}`)); }
+
+                setPanelMode('list'); setTempMarker(null); setShowEditPlaceModal(false); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
             };
 
             const handleUpdateTravelMode = (dayId, placeId, newMode) => {
@@ -1198,7 +1196,10 @@
 
             const confirmDeletePlace = () => {
                 const newDays = trip.days.map(d => String(d.id) === String(activeDayId) ? { ...d, places: d.places.filter(p => p.id !== placeToDelete && p.id !== newItem.id) } : d);
-                pushUpdate({ trip: { ...trip, days: newDays } }); setPlaceToDelete(null); setPanelMode('list'); setShowEditPlaceModal(false); restoreListScroll();
+                pushUpdate({ trip: { ...trip, days: newDays } }); 
+                // 清理被刪除景點的專屬圖庫
+                window.FirebaseSDK.deleteDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${placeToDelete}`));
+                setPlaceToDelete(null); setPanelMode('list'); setShowEditPlaceModal(false); restoreListScroll();
             };
 
             const toggleNote = (placeId, e) => { e.stopPropagation(); setExpandedNotes(prev => ({ ...prev, [placeId]: !prev[placeId] })); };
@@ -1457,17 +1458,17 @@
                                                 <div className="flex flex-col mt-2">
                                                     {activeDayData?.places.map((p, i) => {
                                                         const isNoteExpanded = expandedNotes[p.id];
+                                                        const placeImg = images[`place_${p.id}`]; // 使用分離圖庫
                                                         return (
                                                             <div key={p.id} onDragOver={(e) => { e.preventDefault(); if (draggedPlaceIndexRef.current !== i) setDragOverPlaceIndex(i); }} onDrop={(e) => { handleDrop(e, i); setDragOverPlaceIndex(null); }} className="flex flex-col">
                                                                 {dragOverPlaceIndex === i && draggedPlaceIndexRef.current !== null && draggedPlaceIndexRef.current > i && (<div className="w-full h-24 bg-blue-500/10 border-2 border-dashed border-blue-400 rounded-xl mb-4 pointer-events-none flex items-center justify-center animate-fade-in shadow-inner"><span className="text-blue-400 font-bold text-sm bg-blue-900/40 px-3 py-1 rounded-full">放在此處</span></div>)}
                                                                 <div id={`place-card-${p.id}`} draggable={true} onDragStart={e => handleDragStart(e, i, p.id)} onDragEnd={handleDragEnd} className={`flex flex-col group/card transition-all duration-200 ${draggedPlaceIndex === i ? 'opacity-30 scale-[0.98]' : ''}`}>
                                                                     <div className="flex gap-2.5 items-stretch">
                                                                         <div className="flex flex-col items-center w-10 shrink-0"><div className="text-[11px] font-bold text-blue-300 font-mono mb-1.5 pt-1">{p.time}</div><div onPointerDown={() => setDragEnabledId(p.id)} onTouchStart={() => setDragEnabledId(p.id)} className="drag-handle w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold text-white mt-1 shadow-lg shadow-blue-900/50 border-2 border-slate-900 cursor-grab active:cursor-grabbing hover:bg-blue-500 transition-colors">{i+1}</div>{i < activeDayData.places.length - 1 && <div className="w-0.5 bg-slate-700 flex-1 mt-1.5 min-h-[1.5rem]"></div>}</div>
-                                                                        {/* 移除了原本造成視覺偏下的 pb-3 */}
                                                                         <div className="flex-1">
                                                                             <div className={`flex items-stretch overflow-hidden rounded-xl border border-slate-700 bg-slate-800/90 transition-all ${hoveredPlaceId === p.id ? 'border-blue-500 shadow-xl' : ''}`} onMouseEnter={() => setHoveredPlaceId(p.id)} onMouseLeave={() => setHoveredPlaceId(null)}>
-                                                                                <div className="w-[85px] sm:w-[120px] bg-slate-700/50 shrink-0 relative cursor-pointer overflow-hidden group/img flex items-center justify-center" onClick={() => p.image && setPreviewImage(p.image)}>{p.image ? (<img src={p.image} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-300 pointer-events-none" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={24} /></div>)}{p.image && <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
-                                                                                <div className="flex-1 min-w-0 relative p-2"><div className="flex justify-between items-start"><div className="flex flex-col"><div className="flex items-start gap-0.5">{p.note && (<button onClick={(e) => toggleNote(p.id, e)} className="mt-0.5 text-slate-400 hover:text-blue-400 transition-colors shrink-0 outline-none">{isNoteExpanded ? <Icons.ChevronUp size={16} /> : <Icons.ChevronDown size={16} />}</button>)}<h3 className={`font-bold text-slate-100 text-sm md:text-base leading-snug ${isNoteExpanded ? '' : 'line-clamp-2'}`}>{p.name}</h3></div>{p.note && isNoteExpanded && (<div className="mt-1.5 ml-4 text-xs md:text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledId(p.id)} onTouchStart={() => setDragEnabledId(p.id)} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg cursor-grab active:cursor-grabbing transition-colors"><Icons.GripVertical size={16} /></div><button onClick={() => { saveListScroll(); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setPanelMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><Icons.MoreVertical size={16} /></button></div></div><div className={`text-[10px] md:text-[11px] text-slate-400 mt-1 ${p.note ? 'ml-4' : ''}`}>停留 {formatStayTime(p.stayTime)}</div><div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${p.note ? 'ml-4' : ''}`}><span className="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span></div></div>
+                                                                                <div className="w-[85px] sm:w-[120px] bg-slate-700/50 shrink-0 relative cursor-pointer overflow-hidden group/img flex items-center justify-center" onClick={() => placeImg && setPreviewImage(placeImg)}>{placeImg ? (<img src={placeImg} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-300 pointer-events-none" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={24} /></div>)}{placeImg && <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
+                                                                                <div className="flex-1 min-w-0 relative p-2"><div className="flex justify-between items-start"><div className="flex flex-col"><div className="flex items-start gap-0.5">{p.note && (<button onClick={(e) => toggleNote(p.id, e)} className="mt-0.5 text-slate-400 hover:text-blue-400 transition-colors shrink-0 outline-none">{isNoteExpanded ? <Icons.ChevronUp size={16} /> : <Icons.ChevronDown size={16} />}</button>)}<h3 className={`font-bold text-slate-100 text-sm md:text-base leading-snug ${isNoteExpanded ? '' : 'line-clamp-2'}`}>{p.name}</h3></div>{p.note && isNoteExpanded && (<div className="mt-1.5 ml-4 text-xs md:text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledId(p.id)} onTouchStart={() => setDragEnabledId(p.id)} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg cursor-grab active:cursor-grabbing transition-colors"><Icons.GripVertical size={16} /></div><button onClick={() => { saveListScroll(); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: images[`place_${p.id}`] || null }); setPanelMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><Icons.MoreVertical size={16} /></button></div></div><div className={`text-[10px] md:text-[11px] text-slate-400 mt-1 ${p.note ? 'ml-4' : ''}`}>停留 {formatStayTime(p.stayTime)}</div><div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${p.note ? 'ml-4' : ''}`}><span className="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span></div></div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -1562,22 +1563,8 @@
                                                     </div>
                                                     
                                                     <div className="pt-2 border-t border-slate-700/50 mt-4">
-                                                        <label className="block text-xs font-bold text-slate-400 mb-2">景點圖片 (支援 Google 雲端網址或上傳)</label>
+                                                        <label className="block text-xs font-bold text-slate-400 mb-2">景點圖片</label>
                                                         <div className="flex flex-col gap-3">
-                                                            <input 
-                                                                type="text" 
-                                                                placeholder="貼上圖片網址 (支援 Google Drive 分享連結)" 
-                                                                value={newItem.image && newItem.image.startsWith('http') ? newItem.image : ''}
-                                                                onChange={e => setNewItem({...newItem, image: processImageUrl(e.target.value)})}
-                                                                className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                            />
-                                                            
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="flex-1 h-px bg-slate-700"></div>
-                                                                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">OR</span>
-                                                                <div className="flex-1 h-px bg-slate-700"></div>
-                                                            </div>
-
                                                             {newItem.image ? (
                                                                 <div className="relative w-full h-40 bg-slate-800 rounded-xl overflow-hidden border border-slate-600 shadow-md group shrink-0">
                                                                     <img src={newItem.image} className="w-full h-full object-cover" alt="Preview" />
@@ -1848,13 +1835,15 @@
                                                 <div key={cat.type} className="space-y-4 animate-fade-in">
                                                     <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${cat.border} ${cat.bg}`}><CategoryIconWithLabel type={cat.type} size={18} /><h3 className={`font-bold ${cat.color} tracking-wide`}>{cat.title} ({places.length})</h3></div>
                                                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 px-1">
-                                                        {places.map(p => (
+                                                        {places.map(p => {
+                                                            const placeImg = images[`place_${p.id}`]; // 應用分離圖庫
+                                                            return (
                                                             <div key={`${p.id}-${p.dayIdx}`} onClick={() => handleJumpToPlace(p)} className="bg-slate-800 rounded-lg border border-slate-700 flex flex-col overflow-hidden hover:border-blue-500 transition-all shadow-sm cursor-pointer group relative">
-                                                                <button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(p.dayId); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setModalMode('edit'); }} className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 hover:bg-blue-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all z-20 shadow-md backdrop-blur-sm" title="編輯景點"><Icons.MoreVertical size={14} /></button>
-                                                                <div className="w-full aspect-square bg-slate-700/50 relative flex items-center justify-center overflow-hidden">{p.image ? <img src={p.image} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="pointer-events-none opacity-30"><CategoryIconWithLabel type={p.type} size={24} /></div>}{p.image && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
+                                                                <button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(p.dayId); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: placeImg || null }); setModalMode('edit'); }} className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 hover:bg-blue-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all z-20 shadow-md backdrop-blur-sm" title="編輯景點"><Icons.MoreVertical size={14} /></button>
+                                                                <div className="w-full aspect-square bg-slate-700/50 relative flex items-center justify-center overflow-hidden">{placeImg ? <img src={placeImg} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="pointer-events-none opacity-30"><CategoryIconWithLabel type={p.type} size={24} /></div>}{placeImg && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
                                                                 <div className="flex flex-col p-2.5 relative text-center"><h4 className="font-bold text-slate-100 text-xs md:text-sm line-clamp-1 group-hover:text-blue-400 transition-colors w-full" title={p.name}>{p.name}</h4><div className="flex items-center gap-1.5 mt-1 justify-center opacity-70"><span className="text-[10px] md:text-xs font-bold text-blue-400">D{p.dayIdx}</span><span className="text-[10px] md:text-xs text-slate-400 font-mono">{p.time}</span></div></div>
                                                             </div>
-                                                        ))}
+                                                        )})}
                                                     </div>
                                                 </div>
                                             );
@@ -1881,18 +1870,18 @@
                                                                         const draggedIdxInList = draggedOverviewPlace?.dayId === day.id ? draggedOverviewPlace.placeIndex : -1;
                                                                         const isDraggingDown = draggedIdxInList !== -1 && draggedIdxInList < i;
                                                                         const isDraggingUp = draggedIdxInList === -1 || draggedIdxInList > i;
+                                                                        const placeImg = images[`place_${p.id}`]; // 應用分離圖庫
                                                                         return (
                                                                         <div key={p.id} onDragOver={(e) => { e.preventDefault(); setDragOverOverview({ dayId: day.id, index: i }); }} onDrop={(e) => { handleOverviewDrop(e, day.id, i); setDragOverOverview(null); }} className="flex flex-col">
                                                                             {dragOverOverview?.dayId === day.id && dragOverOverview?.index === i && isDraggingUp && draggedOverviewPlace?.place?.id !== p.id && (<div className="w-full h-20 bg-blue-500/10 border-2 border-dashed border-blue-400 rounded-xl mb-3 pointer-events-none flex items-center justify-center animate-fade-in shadow-inner"><span className="text-blue-400 font-bold text-xs bg-blue-900/40 px-3 py-1 rounded-full">拖放至此</span></div>)}
                                                                             <div draggable={true} onDragStart={(e) => handleOverviewDragStart(e, day.id, i, p)} onDragEnd={handleOverviewDragEnd} className={`flex flex-col group/card transition-all duration-200 ${draggedOverviewPlace?.place?.id === p.id ? 'opacity-30 scale-[0.98]' : 'hover:opacity-90'}`}>
                                                                                 <div className="flex gap-2 items-stretch" onClick={() => handleJumpToPlace({...p, dayId: day.id})}>
                                                                                     <div className="flex flex-col items-center w-10 shrink-0 cursor-pointer"><div className="text-[10px] font-bold text-blue-300 font-mono mb-1 pt-2 md:pt-2.5">{p.time}</div><div className="w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 mt-0.5 border-2 border-slate-700 group-hover/card:bg-blue-600 group-hover/card:text-white group-hover/card:border-blue-600 transition-colors shadow-sm">{i+1}</div>{i < places.length - 1 && <div className="w-0.5 bg-slate-700 flex-1 mt-1 min-h-[1.2rem]"></div>}</div>
-                                                                                    {/* 移除了原本造成視覺偏下的 pb-3 */}
                                                                                     <div className="flex-1 cursor-pointer">
                                                                                         <div className="flex items-stretch overflow-hidden rounded-xl border border-slate-700 bg-slate-800 transition-all group-hover/card:border-blue-500 shadow-md h-full">
-                                                                                            <div className="w-[70px] sm:w-[80px] bg-slate-700/50 shrink-0 relative overflow-hidden flex items-center justify-center">{p.image ? (<img src={p.image} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={16} /></div>)}</div>
+                                                                                            <div className="w-[70px] sm:w-[80px] bg-slate-700/50 shrink-0 relative overflow-hidden flex items-center justify-center">{placeImg ? (<img src={placeImg} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={16} /></div>)}</div>
                                                                                             <div className="flex-1 min-w-0 relative p-2 md:p-2.5 flex flex-col justify-between">
-                                                                                                <div className="flex justify-between items-start gap-1"><div className="flex flex-col min-w-0"><h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>{p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} onClick={(e) => e.stopPropagation()} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={14} /></div><button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: p.image || null }); setModalMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="編輯景點"><Icons.MoreVertical size={14} /></button></div></div>
+                                                                                                <div className="flex justify-between items-start gap-1"><div className="flex flex-col min-w-0"><h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>{p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} onClick={(e) => e.stopPropagation()} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={14} /></div><button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: placeImg || null }); setModalMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="編輯景點"><Icons.MoreVertical size={14} /></button></div></div>
                                                                                                 <div className="flex items-center gap-1.5 mt-1 justify-between"><span className="px-1.5 py-0.5 rounded text-[9px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span><span className="text-[9px] text-slate-500 font-medium">停留 {formatStayTimeShort(p.stayTime)}</span></div>
                                                                                             </div>
                                                                                         </div>
@@ -2106,22 +2095,8 @@
                                         </div>
                                         
                                         <div className="pt-2 border-t border-slate-700/50 mt-4">
-                                            <label className="block text-xs font-bold text-slate-400 mb-2">景點圖片 (支援 Google 雲端網址或上傳)</label>
+                                            <label className="block text-xs font-bold text-slate-400 mb-2">景點圖片</label>
                                             <div className="flex flex-col gap-3">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="貼上圖片網址 (支援 Google Drive 分享連結)" 
-                                                    value={newItem.image && newItem.image.startsWith('http') ? newItem.image : ''}
-                                                    onChange={e => setNewItem({...newItem, image: processImageUrl(e.target.value)})}
-                                                    className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                />
-                                                
-                                                <div className="flex items-center gap-4">
-                                                    <div className="flex-1 h-px bg-slate-700"></div>
-                                                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">OR</span>
-                                                    <div className="flex-1 h-px bg-slate-700"></div>
-                                                </div>
-
                                                 {newItem.image ? (
                                                     <div className="relative w-full h-40 bg-slate-800 rounded-xl overflow-hidden border border-slate-600 shadow-md group shrink-0">
                                                         <img src={newItem.image} className="w-full h-full object-cover" alt="Preview" />
