@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="referrer" content="no-referrer" />
-    <title>旅遊行程規劃助手 - 完美完全版</title>
+    <title>旅遊行程規劃助手 - 終極跨行程版</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -23,12 +23,12 @@
     <script type="module">
         import { initializeApp } from "https://gs.jurieo.com/gemini/gstatic/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://gs.jurieo.com/gemini/gstatic/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, onSnapshot, updateDoc, collection, deleteDoc } from "https://gs.jurieo.com/gemini/gstatic/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, getDoc, onSnapshot, updateDoc, collection, deleteDoc } from "https://gs.jurieo.com/gemini/gstatic/firebasejs/11.6.1/firebase-firestore.js";
 
         window.FirebaseSDK = { 
             initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, 
             getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, 
-            doc, setDoc, onSnapshot, updateDoc, collection, deleteDoc 
+            doc, setDoc, getDoc, onSnapshot, updateDoc, collection, deleteDoc 
         };
     </script>
 
@@ -105,6 +105,9 @@
             Briefcase: (p) => <Icon {...p} path={<><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />,
             Search: (p) => <Icon {...p} path={<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>} />,
             Move: (p) => <Icon {...p} path={<><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></>} />,
+            Bookmark: (p) => <Icon {...p} path={<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>} />,
+            Copy: (p) => <Icon {...p} path={<><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>} />,
+            MoveRight: (p) => <Icon {...p} path={<><path d="M18 8L22 12L18 16"/><path d="M2 12H22"/></>} />,
         };
 
         const firebaseConfig = {
@@ -405,7 +408,7 @@
                 default: return <span style={style} title="晴天">☀️</span>;
             }
         };
-const TravelSegmentUI = ({ p1, p2, onUpdateMode, onMouseEnter, onMouseLeave, onTouchStart }) => {
+        const TravelSegmentUI = ({ p1, p2, onUpdateMode, onMouseEnter, onMouseLeave, onTouchStart }) => {
             let mode = p1.travelMode || 'drive'; 
             if (mode === 'transit') mode = 'subway'; 
             const travelInfo = calculateTravelInfo(p1, p2);
@@ -646,21 +649,25 @@ const TravelSegmentUI = ({ p1, p2, onUpdateMode, onMouseEnter, onMouseLeave, onT
             );
         });
 
-        const Dashboard = ({ trips, onCreateTrip, onSelectTrip, onDeleteTrip, onImportTrip, onExportTrip, toast }) => {
+        const Dashboard = ({ trips, onCreateTrip, onSelectTrip, onDeleteTrip, onImportTrip, onExportTrip, onOpenLibrary, toast }) => {
             const fileInputRef = useRef(null);
+            // 隱藏特殊收藏庫不顯示在一般網格中
+            const displayTrips = trips.filter(t => t.id !== 'trip_global_library');
+
             return (
                 <div className="flex justify-center h-full bg-[#0f172a] overflow-y-auto w-full relative">
                     {toast && (<div className="fixed top-10 left-1/2 -translate-x-1/2 z-[100] animate-toast"><div className="bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 border border-slate-700"><span>{toast}</span></div></div>)}
                     <div className="max-w-[960px] w-full px-4 md:px-0">
                         <div className="my-10"><h1 className="text-3xl font-bold mb-4 text-slate-100">我的行程</h1></div>
                         <div className="my-8 flex justify-end gap-3 flex-wrap">
+                            <button onClick={onOpenLibrary} className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-amber-400 px-5 py-2.5 rounded-xl font-bold shadow-lg transition-all cursor-pointer border border-slate-600"><Icons.Bookmark size={20} /> 行程收藏庫</button>
                             <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={onImportTrip} />
                             <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition-all cursor-pointer border border-slate-600"><Icons.Upload size={20} /> 匯入</button>
                             <button onClick={onCreateTrip} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-900/30 transition-all cursor-pointer"><Icons.Plus size={20} /> 建立行程</button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
-                            {trips.length === 0 ? (<div className="col-span-full text-center py-20 text-slate-500"><p>目前還沒有行程，開始建立你的第一個旅程吧！</p></div>) : (
-                                trips.map((tripData, index) => {
+                            {displayTrips.length === 0 ? (<div className="col-span-full text-center py-20 text-slate-500"><p>目前還沒有行程，開始建立你的第一個旅程吧！</p></div>) : (
+                                displayTrips.map((tripData, index) => {
                                     const mockImgNum = (index % 20) + 30; 
                                     return (
                                         <div key={tripData.id} onClick={() => onSelectTrip(tripData.id)} className="relative bg-slate-800 rounded-2xl overflow-hidden shadow-xl border border-slate-700 hover:border-blue-500 hover:shadow-blue-900/20 transition-all cursor-pointer group flex flex-col h-[280px]">
@@ -689,7 +696,8 @@ const TravelSegmentUI = ({ p1, p2, onUpdateMode, onMouseEnter, onMouseLeave, onT
                 </div>
             );
         };
-const MemberNameInput = React.memo(({ member, onUpdate }) => {
+
+        const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const [name, setName] = useState(member.name);
             useEffect(() => { setName(member.name); }, [member.name]);
             
@@ -756,7 +764,7 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             );
         });
 
-        const TripPlanner = ({ tripId, onBack, db, appId, user }) => {
+        const TripPlanner = ({ tripId, trips, onBack, onOpenLibrary, db, appId, user, isLibraryModal }) => {
             const [trip, setTrip] = useState({ title: '', dates: '', days: [] });
             const [members, setMembers] = useState([]);
             const [expenses, setExpenses] = useState([]);
@@ -810,6 +818,10 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const [showEditPlaceModal, setShowEditPlaceModal] = useState(false);
             const [showClearOrphanedConfirm, setShowClearOrphanedConfirm] = useState(null);
             
+            const [transferConfig, setTransferConfig] = useState(null);
+            const [transferTargetTrip, setTransferTargetTrip] = useState('');
+            const [transferTargetDay, setTransferTargetDay] = useState('');
+
             const [placeToDelete, setPlaceToDelete] = useState(null);
             const [expenseToDelete, setExpenseToDelete] = useState(null);
             const [shoppingToDelete, setShoppingToDelete] = useState(null);
@@ -823,6 +835,7 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const [showCopyPackingModal, setShowCopyPackingModal] = useState(null);
             const [activeExpenseMenu, setActiveExpenseMenu] = useState(null);
             const [activeShoppingMenu, setActiveShoppingMenu] = useState(null);
+            const [activePlaceMenu, setActivePlaceMenu] = useState(null);
 
             const isDraggingDay = useRef(false);
             const dragStartX = useRef(0);
@@ -833,8 +846,7 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const overviewContainerRef = useRef(null);
             const [overviewScroll, setOverviewScroll] = useState(0);
             const isSliderDragging = useRef(false);
-
-            const [draggedOverviewPlace, setDraggedOverviewPlace] = useState(null);
+const [draggedOverviewPlace, setDraggedOverviewPlace] = useState(null);
             const [dragEnabledOverviewId, setDragEnabledOverviewId] = useState(null);
             const [dragOverOverview, setDragOverOverview] = useState(null);
 
@@ -925,7 +937,8 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const handleOverviewDragEnd = () => { setDraggedOverviewPlace(null); setDragEnabledOverviewId(null); setDragOverOverview(null); };
             const handleOverviewScroll = (e) => { const val = e.target.value; setOverviewScroll(val); if (overviewContainerRef.current) { const maxScroll = overviewContainerRef.current.scrollWidth - overviewContainerRef.current.clientWidth; overviewContainerRef.current.scrollLeft = (val / 100) * maxScroll; } };
             const handleOverviewContainerScroll = () => { if (!isSliderDragging.current && overviewContainerRef.current) { const el = overviewContainerRef.current; const maxScroll = el.scrollWidth - el.clientWidth; if (maxScroll > 0) { setOverviewScroll((el.scrollLeft / maxScroll) * 100); } } };
-useEffect(() => {
+
+            useEffect(() => {
                 if (!user || !tripId) return;
                 const tripDocRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId);
                 return window.FirebaseSDK.onSnapshot(tripDocRef, (snap) => {
@@ -985,7 +998,7 @@ useEffect(() => {
 
             const pushUpdate = (data) => {
                 window.FirebaseSDK.updateDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripId), JSON.parse(JSON.stringify(data)))
-                .catch(err => { if (err.message.includes('exceeds the maximum')) showMsg('❌ 儲存失敗：此行程總容量已達 1MB！請點擊右上角「🧹空間瘦身」'); else showMsg('❌ 同步失敗，請檢查網路連線'); });
+                .catch(err => { if (err.message.includes('exceeds the maximum')) showMsg('❌ 儲存失敗：此行程總容量已達上限！請減少文字量'); else showMsg('❌ 同步失敗，請檢查網路連線'); });
             };
 
             const compressImageAsync = (dataUrlOrImg, isAvatar = false) => new Promise((resolve) => {
@@ -1024,47 +1037,37 @@ useEffect(() => {
                 } else { process(dataUrlOrImg); }
             });
 
-            const handleOptimizeTrip = async () => {
-                showMsg('🔄 開始掃描並壓縮獨立圖片庫 (這可能需要幾秒鐘)...');
-                let originalTotalSize = 0; let newTotalSize = 0; let optimizedCount = 0;
-
-                for (const [imgId, base64Str] of Object.entries(images)) {
-                    if (base64Str && base64Str.startsWith('data:image')) {
-                        const oldLen = base64Str.length; originalTotalSize += oldLen;
-                        const newImg = await compressImageAsync(base64Str, false);
-                        if (newImg.length < oldLen * 0.9) { 
-                            await window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, imgId), { image: newImg });
-                            optimizedCount++;
-                        }
-                        newTotalSize += newImg.length < oldLen * 0.9 ? newImg.length : oldLen;
-                    }
-                }
-                
-                let membersModified = false; let newMembers = JSON.parse(JSON.stringify(members || []));
-                for (let m of newMembers) {
-                    if (m.avatar && m.avatar.startsWith('data:image')) {
-                        const oldLen = m.avatar.length; originalTotalSize += oldLen;
-                        const newAvatar = await compressImageAsync(m.avatar, true);
-                        if (newAvatar.length < oldLen) { m.avatar = newAvatar; membersModified = true; }
-                        newTotalSize += m.avatar.length;
-                    }
-                }
-                if (membersModified) pushUpdate({ members: newMembers });
-
-                const savedKB = Math.round((originalTotalSize - newTotalSize) / 1024);
-                if (optimizedCount > 0 || membersModified) {
-                    showMsg(`✅ 獨立圖片瘦身完成！共優化 ${optimizedCount} 張景點圖，釋放 ${savedKB} KB 空間！`);
-                } else {
-                    showMsg('✅ 目前所有圖片庫已經是最佳狀態，無需再瘦身。');
-                }
-            };
-
             const showMsg = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
             const activeDayData = useMemo(() => trip.days?.find(d => d.id === activeDayId) || trip.days?.[0], [trip, activeDayId]);
             const getMemberInfo = useCallback((name) => members.find(m => m.name === name) || { color: 'bg-gray-400', avatar: '👤', name: '未知' }, [members]);
 
             const stateRef = useRef({ trip, activeDayId, hoveredPlaceId, panelMode, modalMode, newItem, activeTab, showEditPlaceModal });
             useEffect(() => { stateRef.current = { trip, activeDayId, hoveredPlaceId, panelMode, modalMode, newItem, activeTab, showEditPlaceModal }; }, [trip, activeDayId, hoveredPlaceId, panelMode, modalMode, newItem, activeTab, showEditPlaceModal]);
+
+            useEffect(() => {
+                const handleGlobalPaste = (e) => {
+                    const current = stateRef.current;
+                    if (current.activeTab !== 'itinerary' && !current.showEditPlaceModal) return;
+                    
+                    const items = e.clipboardData?.items; if (!items) return;
+                    let imageFile = null; for (let i = 0; i < items.length; i++) { if (items[i].type.indexOf('image') !== -1) { imageFile = items[i].getAsFile(); break; } }
+                    if (imageFile) {
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                            const dataUrl = await compressImageAsync(event.target.result, false);
+                            const kbSize = Math.round(dataUrl.length / 1024);
+                            if (current.panelMode === 'add' || current.panelMode === 'edit' || current.showEditPlaceModal) {
+                                setNewItem(prev => ({ ...prev, image: dataUrl })); showMsg(`✅ 圖片已貼上 (${kbSize}KB)`);
+                            } else if (current.hoveredPlaceId) {
+                                window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${current.hoveredPlaceId}`), { image: dataUrl });
+                                showMsg(`✅ 圖片已瞬間存入專屬圖庫 (${kbSize}KB)`);
+                            }
+                        }; reader.readAsDataURL(imageFile);
+                    }
+                };
+                document.addEventListener('paste', handleGlobalPaste);
+                return () => document.removeEventListener('paste', handleGlobalPaste);
+            }, [db, appId, tripId]);
 
             const handleAddressInput = (e) => {
                 const val = e.target.value; setNewItem(p => ({...p, address: val}));
@@ -1168,6 +1171,90 @@ useEffect(() => {
                 else if (newItem.image === null && images[`place_${newItem.id}`]) { window.FirebaseSDK.deleteDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${newItem.id}`)); }
 
                 setPanelMode('list'); setTempMarker(null); setShowEditPlaceModal(false); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); restoreListScroll();
+            };
+
+            const handleTransferSubmit = async () => {
+                if (!transferConfig || !transferTargetTrip || !transferTargetDay) return showMsg('請選擇目標行程與天數');
+                const { place, type, sourceDayId } = transferConfig;
+                showMsg(`⏳ 正在${type === 'copy' ? '複製' : '移動'}景點...`);
+                try {
+                    const isSameTrip = tripId === transferTargetTrip;
+                    
+                    // 【核心修復】同行程「移動」時保持原 ID，跨行程或複製才給新 ID
+                    const keepSameId = isSameTrip && type === 'move';
+                    const newPlaceId = keepSameId ? place.id : ('p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+                    const placeToInsert = { ...place, id: newPlaceId, time: '12:00' };
+
+                    if (isSameTrip) {
+                        let newDays = JSON.parse(JSON.stringify(trip.days));
+                        
+                        if (type === 'move') {
+                            // 【修復】強制轉字串比對，解決 Number 與 String 不匹配導致的消失問題
+                            const sDay = newDays.find(d => String(d.id) === String(sourceDayId));
+                            if (sDay) {
+                                sDay.places = sDay.places.filter(p => String(p.id) !== String(place.id));
+                                sDay.places = cascadeTimes(sDay.places, 0); // 重新計算時間
+                            }
+                        }
+                        
+                        // 【修復】強制轉字串比對
+                        const tDay = newDays.find(d => String(d.id) === String(transferTargetDay));
+                        if (tDay) {
+                            tDay.places.push(placeToInsert);
+                            tDay.places = cascadeTimes(tDay.places, 0); // 重新計算時間
+                        }
+
+                        // 如果是複製，才需要複製圖片
+                        if (!keepSameId && images[`place_${place.id}`]) {
+                            const imgRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${newPlaceId}`);
+                            await window.FirebaseSDK.setDoc(imgRef, { image: images[`place_${place.id}`] });
+                        }
+                        
+                        pushUpdate({ trip: { ...trip, days: newDays } });
+                    } else {
+                        // 跨行程處理
+                        const targetDocRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', transferTargetTrip);
+                        const targetSnap = await window.FirebaseSDK.getDoc(targetDocRef);
+                        if (!targetSnap.exists()) throw new Error("找不到目標行程");
+                        const targetData = targetSnap.data();
+                        let targetTrip = targetData.trip;
+                        
+                        // 【修復】強制轉字串比對
+                        const targetDayIndex = targetTrip.days.findIndex(d => String(d.id) === String(transferTargetDay));
+                        if (targetDayIndex === -1) throw new Error("找不到目標天數");
+
+                        targetTrip.days[targetDayIndex].places.push(placeToInsert);
+                        targetTrip.days[targetDayIndex].places = cascadeTimes(targetTrip.days[targetDayIndex].places, 0);
+
+                        // 跨行程圖片轉移
+                        if (images[`place_${place.id}`]) {
+                            const targetImgRef = window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${transferTargetTrip}`, `place_${newPlaceId}`);
+                            await window.FirebaseSDK.setDoc(targetImgRef, { image: images[`place_${place.id}`] });
+                        }
+                        await window.FirebaseSDK.updateDoc(targetDocRef, { trip: targetTrip });
+
+                        if (type === 'move') {
+                            let newLocalDays = JSON.parse(JSON.stringify(trip.days));
+                            const sDay = newLocalDays.find(d => String(d.id) === String(sourceDayId));
+                            if (sDay) {
+                                sDay.places = sDay.places.filter(p => String(p.id) !== String(place.id));
+                                sDay.places = cascadeTimes(sDay.places, 0);
+                            }
+                            pushUpdate({ trip: { ...trip, days: newLocalDays } });
+                            
+                            // 跨行程移動成功後，刪除原行程的圖片
+                            if (images[`place_${place.id}`]) {
+                                window.FirebaseSDK.deleteDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', `trip_images_${tripId}`, `place_${place.id}`));
+                            }
+                        }
+                    }
+                    showMsg(`✅ 成功${type === 'copy' ? '複製' : '移動'}景點！`);
+                    setTransferConfig(null);
+                    setActivePlaceMenu(null);
+                } catch (err) { 
+                    console.error(err);
+                    showMsg(`❌ 操作失敗: ${err.message}`); 
+                }
             };
 
             const handleUpdateTravelMode = (dayId, placeId, newMode) => {
@@ -1281,10 +1368,31 @@ useEffect(() => {
                 e.preventDefault(); 
                 const expenseData = { id: newExpenseItem.id || 'e_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5), payer: newExpenseItem.payer, title: newExpenseItem.title, category: newExpenseItem.category, sharedBy: newExpenseItem.sharedBy, amount: Number(newExpenseItem.amount), currency: newExpenseItem.currency, amountJPY: convertCurr(Number(newExpenseItem.amount), newExpenseItem.currency, 'JPY'), images: newExpenseItem.images || [] }; 
                 let newExpenses = JSON.parse(JSON.stringify(expenses)); 
-                if (newExpenseItem.id) { newExpenses = newExpenses.map(day => ({ ...day, items: day.items.filter(i => i.id !== newExpenseItem.id) })).filter(day => day.items.length > 0); }
-                const dayIndex = newExpenses.findIndex(d => d.date === newExpenseItem.date); 
-                if (dayIndex >= 0) newExpenses[dayIndex].items.push(expenseData); 
-                else newExpenses.push({ date: newExpenseItem.date, items: [expenseData] }); 
+                
+                if (newExpenseItem.id) {
+                    let replaced = false;
+                    for (let i = 0; i < newExpenses.length; i++) {
+                        if (newExpenses[i].date === newExpenseItem.date) {
+                            const idx = newExpenses[i].items.findIndex(item => item.id === newExpenseItem.id);
+                            if (idx !== -1) {
+                                newExpenses[i].items[idx] = expenseData;
+                                replaced = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!replaced) {
+                        newExpenses = newExpenses.map(day => ({ ...day, items: day.items.filter(i => i.id !== newExpenseItem.id) })).filter(day => day.items.length > 0);
+                        const dayIndex = newExpenses.findIndex(d => d.date === newExpenseItem.date); 
+                        if (dayIndex >= 0) newExpenses[dayIndex].items.push(expenseData); 
+                        else newExpenses.push({ date: newExpenseItem.date, items: [expenseData] }); 
+                    }
+                } else {
+                    const dayIndex = newExpenses.findIndex(d => d.date === newExpenseItem.date); 
+                    if (dayIndex >= 0) newExpenses[dayIndex].items.push(expenseData); 
+                    else newExpenses.push({ date: newExpenseItem.date, items: [expenseData] }); 
+                }
+                
                 pushUpdate({ expenses: newExpenses.sort((a, b) => new Date(a.date) - new Date(b.date)) }); setShowExpenseModal(false); 
                 const defaultDate = activeDayData?.date ? activeDayData.date.split(' ')[0].replace(/\//g, '-') : new Date().toISOString().split('T')[0];
                 setNewExpenseItem({ id: undefined, date: defaultDate, title: '', category: 'food', payer: members[0]?.name || '', amount: '', currency: displayCurrency, sharedBy: members.map(m => m.name), images: [] }); 
@@ -1418,8 +1526,7 @@ useEffect(() => {
             }, [trip.days]);
 
             const categoryConfigs = [ { type: 'sight', title: '景點', color: 'text-green-400', border: 'border-green-500/30', bg: 'bg-green-500/10' }, { type: 'food', title: '餐廳', color: 'text-orange-400', border: 'border-orange-500/30', bg: 'bg-orange-500/10' }, { type: 'shopping', title: '購物', color: 'text-pink-400', border: 'border-pink-500/30', bg: 'bg-pink-500/10' }, { type: 'accommodation', title: '住宿', color: 'text-purple-400', border: 'border-purple-500/30', bg: 'bg-purple-500/10' }, { type: 'transport', title: '交通', color: 'text-blue-400', border: 'border-blue-500/30', bg: 'bg-blue-500/10' } ];
-
-            return (
+return (
                 <div className="flex flex-col h-[100dvh] bg-slate-900 text-slate-100 font-sans relative">
                     {toast && <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-toast"><div className="bg-slate-800 text-white px-6 py-3 rounded-full border border-slate-700 shadow-2xl font-bold tracking-wide"><span>{toast}</span></div></div>}
                     
@@ -1436,14 +1543,22 @@ useEffect(() => {
                         </div>
                     )}
                     
-                    <header className="h-14 border-b border-slate-800 flex items-center justify-between px-3 md:px-4 bg-slate-900 shrink-0 z-20 shadow-lg">
+                  <header className="h-14 border-b border-slate-800 flex items-center justify-between px-3 md:px-4 bg-slate-900 shrink-0 z-20 shadow-lg">
                         <div className="flex items-center gap-3 flex-1">
                             <button onClick={onBack} className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-300 shrink-0"><Icons.ArrowLeft size={20} /></button>
                             <div className={`w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold hover:scale-105 transition-transform shrink-0`}><input value={trip.icon || '🚀'} onChange={e => pushUpdate({trip:{...trip, icon:e.target.value}})} className="w-full h-full bg-transparent text-center text-lg outline-none cursor-pointer" maxLength="2"/></div>
-                            <div className="flex flex-col min-w-0 flex-1"><input value={trip.title} onChange={(e) => pushUpdate({trip:{...trip, title:e.target.value}})} className="text-sm font-bold bg-transparent outline-none w-full" /><input value={trip.dates} onChange={(e) => pushUpdate({trip:{...trip, dates:e.target.value}})} className="text-xs text-slate-500 bg-transparent outline-none w-full" /></div>
+                            <div className="flex flex-col min-w-0 flex-1 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <input value={trip.title} onChange={(e) => pushUpdate({trip:{...trip, title:e.target.value}})} className="text-sm font-bold bg-transparent outline-none flex-1 min-w-[100px]" />
+                                    {tripId === 'trip_global_library' && <span className="bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-500/30 whitespace-nowrap shrink-0">行程收藏庫</span>}
+                                </div>
+                                <input value={trip.dates} onChange={(e) => pushUpdate({trip:{...trip, dates:e.target.value}})} className="text-xs text-slate-500 bg-transparent outline-none w-full mt-0.5" />
+                            </div>
                         </div>
                         <div className="flex items-center gap-2 md:gap-3 shrink-0 ml-2">
-                            <button onClick={handleOptimizeTrip} className="p-1.5 md:px-3 md:py-1.5 text-amber-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-700" title="壓縮所有舊照片，釋放大量儲存空間">🧹<span className="hidden md:inline text-xs font-bold">空間瘦身</span></button>
+                            {tripId !== 'trip_global_library' && (
+                                <button onClick={onOpenLibrary} className="p-1.5 md:px-3 md:py-1.5 text-amber-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-700" title="開啟行程收藏庫"><Icons.Bookmark size={16} /><span className="hidden md:inline text-xs font-bold">行程收藏庫</span></button>
+                            )}
                             <button onClick={() => setShowMemberSettings(true)} className="p-1.5 md:px-3 md:py-1.5 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-700" title="成員管理"><Icons.Users size={16} /><span className="hidden md:inline text-xs font-bold">成員</span></button>
                         </div>
                     </header>
@@ -1457,7 +1572,6 @@ useEffect(() => {
                     </div>
                     
                     <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative bg-slate-950">
-                        {/* 行程分頁 (隱藏但不卸載地圖，維持效能) */}
                         <div className={`w-full flex-col md:flex-row h-full absolute inset-0 bg-slate-950 ${activeTab === 'itinerary' ? 'flex z-10 opacity-100 pointer-events-auto' : 'hidden z-0 opacity-0 pointer-events-none'}`}>
                             <div className="w-full h-[40vh] md:h-full md:flex-1 relative order-1 md:order-2 shrink-0 z-0 border-b md:border-b-0 md:border-l border-slate-800 shadow-md md:shadow-none">
                                 <RealMap places={activeDayData?.places || []} hoveredId={hoveredPlaceId} hoveredSegmentId={hoveredSegmentId} zoomControlKey={activeDayId} dayColor={activeDayData?.color} onRouteAltSelect={(pId, altIdx) => handleUpdateRouteIndex(activeDayData.id, pId, altIdx)} tempMarker={tempMarker} isActive={activeTab === 'itinerary'} />
@@ -1493,7 +1607,7 @@ useEffect(() => {
                                                                     <div className="flex-1">
                                                                         <div className={`flex items-stretch overflow-hidden rounded-xl border border-slate-700 bg-slate-800/90 transition-all ${hoveredPlaceId === p.id ? 'border-blue-500 shadow-xl' : ''}`} onMouseEnter={() => setHoveredPlaceId(p.id)} onMouseLeave={() => setHoveredPlaceId(null)}>
                                                                             <div className="w-[85px] sm:w-[120px] bg-slate-700/50 shrink-0 relative cursor-pointer overflow-hidden group/img flex items-center justify-center" onClick={() => placeImg && setPreviewImage(placeImg)}>{placeImg ? (<img src={placeImg} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-300 pointer-events-none" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={24} /></div>)}{placeImg && <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
-                                                                            <div className="flex-1 min-w-0 relative p-2"><div className="flex justify-between items-start"><div className="flex flex-col"><div className="flex items-start gap-0.5">{p.note && (<button onClick={(e) => toggleNote(p.id, e)} className="mt-0.5 text-slate-400 hover:text-blue-400 transition-colors shrink-0 outline-none">{isNoteExpanded ? <Icons.ChevronUp size={16} /> : <Icons.ChevronDown size={16} />}</button>)}<h3 className={`font-bold text-slate-100 text-sm md:text-base leading-snug ${isNoteExpanded ? '' : 'line-clamp-2'}`}>{p.name}</h3></div>{p.note && isNoteExpanded && (<div className="mt-1.5 ml-4 text-xs md:text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledId(p.id)} onTouchStart={() => setDragEnabledId(p.id)} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg cursor-grab active:cursor-grabbing transition-colors"><Icons.GripVertical size={16} /></div><button onClick={() => { saveListScroll(); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: images[`place_${p.id}`] || null }); setPanelMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><Icons.MoreVertical size={16} /></button></div></div><div className={`text-[10px] md:text-[11px] text-slate-400 mt-1 ${p.note ? 'ml-4' : ''}`}>停留 {formatStayTime(p.stayTime)}</div><div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${p.note ? 'ml-4' : ''}`}><span className="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span></div></div>
+                                                                            <div className="flex-1 min-w-0 relative p-2"><div className="flex justify-between items-start"><div className="flex flex-col"><div className="flex items-start gap-0.5">{p.note && (<button onClick={(e) => toggleNote(p.id, e)} className="mt-0.5 text-slate-400 hover:text-blue-400 transition-colors shrink-0 outline-none">{isNoteExpanded ? <Icons.ChevronUp size={16} /> : <Icons.ChevronDown size={16} />}</button>)}<h3 className={`font-bold text-slate-100 text-sm md:text-base leading-snug ${isNoteExpanded ? '' : 'line-clamp-2'}`}>{p.name}</h3></div>{p.note && isNoteExpanded && (<div className="mt-1.5 ml-4 text-xs md:text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledId(p.id)} onTouchStart={() => setDragEnabledId(p.id)} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg cursor-grab active:cursor-grabbing transition-colors"><Icons.GripVertical size={16} /></div><button onClick={(e) => { e.stopPropagation(); saveListScroll(); setActivePlaceMenu({...p, sourceDayId: activeDayData.id, image: placeImg}); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"><Icons.MoreVertical size={16} /></button></div></div><div className={`text-[10px] md:text-[11px] text-slate-400 mt-1 ${p.note ? 'ml-4' : ''}`}>停留 {formatStayTime(p.stayTime)}</div><div className={`mt-1.5 flex flex-wrap items-center gap-1.5 ${p.note ? 'ml-4' : ''}`}><span className="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span></div></div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1628,9 +1742,7 @@ useEffect(() => {
                                 )}
                             </div>
                         </div>
-
-                        {/* 花費分頁區塊 */}
-                        {activeTab === 'expenses' && (
+{activeTab === 'expenses' && (
                             <div className="w-full h-full bg-slate-900 p-4 md:p-8 overflow-y-auto relative z-20">
                                 <div className="max-w-[1400px] mx-auto space-y-6 pb-32">
                                     <div className="flex justify-between items-center mb-2"><h2 className="text-2xl font-bold text-slate-100">花費紀錄</h2><div className="flex gap-2"><button onClick={() => setShowExpenseDetails(true)} className="bg-slate-800 hover:bg-slate-700 text-teal-400 px-4 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2 border border-slate-700"><Icons.FileText size={18} /> <span className="hidden sm:inline">明細</span></button><button onClick={() => setShowSettlementPlan(true)} className="bg-slate-800 hover:bg-slate-700 text-blue-400 px-4 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2 border border-slate-700"><Icons.Calculator size={18} /> <span className="hidden sm:inline">結算方案</span></button><button onClick={() => { const defaultDate = activeDayData?.date ? activeDayData.date.split(' ')[0].replace(/\//g, '-') : '2026-04-03'; setNewExpenseItem({id: undefined, date: defaultDate, title: '', category: 'food', payer: members[0]?.name || '', amount: '', currency: displayCurrency, sharedBy: members.map(m => m.name), images: []}); setShowExpenseModal(true); }} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2"><Icons.Plus size={18} /> 新增</button></div></div>
@@ -1662,7 +1774,6 @@ useEffect(() => {
                                                         const originalAmount = item.amount !== undefined ? item.amount : item.amountJPY; const originalCurr = item.currency || 'JPY'; const convertedDisplayAmt = convertCurr(originalAmount, originalCurr, displayCurrency);
                                                         const draggedIdxInList = orphanedExpenses.findIndex(i => i.id === draggedExpenseId); const currentItemIndex = orphanedExpenses.findIndex(i => i.id === item.id); const isDraggingDown = draggedIdxInList !== -1 && draggedIdxInList < currentItemIndex; const isDraggingUp = draggedIdxInList === -1 || draggedIdxInList > currentItemIndex;
                                                         
-                                                        // 處理舊版 image 或新版 images
                                                         let itemImages = [];
                                                         if (item.images && Array.isArray(item.images)) itemImages = item.images;
                                                         else if (item.image) itemImages = [item.image];
@@ -1686,11 +1797,7 @@ useEffect(() => {
                                                                                 </button>
                                                                             )}
                                                                         </div>
-                                                                        <div className="font-bold text-slate-100 text-base font-mono leading-none mt-1.5 mb-2">
-                                                                            {displayCurrency} {formatNumber(convertedDisplayAmt, displayCurrency === 'JPY' ? 0 : 1)}
-                                                                            {originalCurr !== displayCurrency && <span className="text-[10px] text-slate-500 font-mono ml-2 font-normal">支付用 ({originalCurr} {formatNumber(originalAmount, originalCurr === 'JPY' ? 0 : 1)})</span>}
-                                                                        </div>
-                                                                        <div className="flex items-end justify-between w-full mt-auto pt-2 border-t border-slate-700/50">
+                                                                        <div className="flex items-end justify-between w-full mt-auto pt-2 border-t border-slate-700/50 mt-2">
                                                                             <div className="flex flex-col min-w-0">
                                                                                 <div className="text-[10px] text-slate-500 mb-1">{formatShortDate(item.date)}</div>
                                                                                 {item.sharedBy && item.sharedBy.length > 0 && (
@@ -1706,6 +1813,16 @@ useEffect(() => {
                                                                                                 ); 
                                                                                             })}
                                                                                         </div>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                            <div className="flex flex-col items-end">
+                                                                                <div className="font-bold text-slate-100 text-sm font-mono leading-none">
+                                                                                    {displayCurrency} {formatNumber(convertedDisplayAmt, displayCurrency === 'JPY' ? 0 : 1)}
+                                                                                </div>
+                                                                                {originalCurr !== displayCurrency && (
+                                                                                    <div className="text-[10px] text-slate-500 font-mono mt-1 leading-none">
+                                                                                        ({originalCurr} {formatNumber(originalAmount, originalCurr === 'JPY' ? 0 : 1)})
                                                                                     </div>
                                                                                 )}
                                                                             </div>
@@ -1955,7 +2072,7 @@ useEffect(() => {
                                                             const placeImg = images[`place_${p.id}`]; 
                                                             return (
                                                             <div key={`${p.id}-${p.dayIdx}`} onClick={() => handleJumpToPlace(p)} className="bg-slate-800 rounded-lg border border-slate-700 flex flex-col overflow-hidden hover:border-blue-500 transition-all shadow-sm cursor-pointer group relative">
-                                                                <button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(p.dayId); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: placeImg || null }); setModalMode('edit'); }} className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 hover:bg-blue-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all z-20 shadow-md backdrop-blur-sm" title="編輯景點"><Icons.MoreVertical size={14} /></button>
+                                                                <button onClick={(e) => { e.stopPropagation(); setActivePlaceMenu({...p, sourceDayId: p.dayId, image: placeImg}); }} className="absolute top-1.5 right-1.5 p-1.5 bg-black/50 hover:bg-blue-600 text-white rounded-md opacity-0 group-hover:opacity-100 transition-all z-20 shadow-md backdrop-blur-sm" title="選項"><Icons.MoreVertical size={14} /></button>
                                                                 <div className="w-full aspect-square bg-slate-700/50 relative flex items-center justify-center overflow-hidden">{placeImg ? <img src={placeImg} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform" /> : <div className="pointer-events-none opacity-30"><CategoryIconWithLabel type={p.type} size={24} /></div>}{placeImg && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors z-10 pointer-events-none"></div>}</div>
                                                                 <div className="flex flex-col p-2.5 relative text-center"><h4 className="font-bold text-slate-100 text-xs md:text-sm line-clamp-1 group-hover:text-blue-400 transition-colors w-full" title={p.name}>{p.name}</h4><div className="flex items-center gap-1.5 mt-1 justify-center opacity-70"><span className="text-[10px] md:text-xs font-bold text-blue-400">D{p.dayIdx}</span><span className="text-[10px] md:text-xs text-slate-400 font-mono">{p.time}</span></div></div>
                                                             </div>
@@ -1997,7 +2114,7 @@ useEffect(() => {
                                                                                         <div className="flex items-stretch overflow-hidden rounded-xl border border-slate-700 bg-slate-800 transition-all group-hover/card:border-blue-500 shadow-md h-full">
                                                                                             <div className="w-[70px] sm:w-[80px] bg-slate-700/50 shrink-0 relative overflow-hidden flex items-center justify-center">{placeImg ? (<img src={placeImg} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={16} /></div>)}</div>
                                                                                             <div className="flex-1 min-w-0 relative p-2 md:p-2.5 flex flex-col justify-between">
-                                                                                                <div className="flex justify-between items-start gap-1"><div className="flex flex-col min-w-0"><h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>{p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} onClick={(e) => e.stopPropagation()} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={14} /></div><button onClick={(e) => { e.stopPropagation(); setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: p.id, name: p.name, time: p.time, type: p.type, address: p.address || '', note: p.note || '', stayTime: p.stayTime || '1', image: placeImg || null }); setModalMode('edit'); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="編輯景點"><Icons.MoreVertical size={14} /></button></div></div>
+                                                                                                <div className="flex justify-between items-start gap-1"><div className="flex flex-col min-w-0"><h3 className="font-bold text-slate-100 text-xs md:text-sm leading-snug line-clamp-2">{p.name}</h3>{p.note && (<div className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{p.note}</div>)}</div><div className="flex items-center gap-0.5 shrink-0 ml-1"><div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} onClick={(e) => e.stopPropagation()} className="drag-handle p-1 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={14} /></div><button onClick={(e) => { e.stopPropagation(); setActivePlaceMenu({...p, sourceDayId: day.id, image: placeImg}); }} className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="選項"><Icons.MoreVertical size={14} /></button></div></div>
                                                                                                 <div className="flex items-center gap-1.5 mt-1 justify-between"><span className="px-1.5 py-0.5 rounded text-[9px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span><span className="text-[9px] text-slate-500 font-medium">停留 {formatStayTimeShort(p.stayTime)}</span></div>
                                                                                             </div>
                                                                                         </div>
@@ -2038,7 +2155,7 @@ useEffect(() => {
                             </div>
                         )}
                     </div>
-{showMemberSettings && (
+                    {showMemberSettings && (
                         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in" onMouseDown={onBackdropDown} onMouseUp={(e) => onBackdropUp(e, () => setShowMemberSettings(false))}>
                             <div className="bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-700 flex flex-col max-h-[90vh]">
                                 <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50 shrink-0">
@@ -2244,6 +2361,57 @@ useEffect(() => {
                                             )}
                                         </div>
                                     </form>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activePlaceMenu && !activePlaceMenu._isLibraryShortcut && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={onBackdropDown} onMouseUp={(e) => onBackdropUp(e, () => setActivePlaceMenu(null))}>
+                            <div className="bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl w-64 overflow-hidden flex flex-col">
+                                <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50"><h3 className="font-bold text-slate-200 truncate pr-4 text-base">{activePlaceMenu.name}</h3><button onClick={() => setActivePlaceMenu(null)} className="text-slate-500 hover:text-white shrink-0"><Icons.X size={18}/></button></div>
+                                <div className="flex flex-col py-1">
+                                    <button onClick={() => { setShowEditPlaceModal(true); setActiveDayId(activePlaceMenu.sourceDayId); setNewItem({ id: activePlaceMenu.id, name: activePlaceMenu.name, time: activePlaceMenu.time, type: activePlaceMenu.type, address: activePlaceMenu.address || '', note: activePlaceMenu.note || '', stayTime: activePlaceMenu.stayTime || '1', image: activePlaceMenu.image || null }); setModalMode('edit'); setActivePlaceMenu(null); }} className="w-full text-left px-5 py-4 text-slate-200 hover:bg-slate-700 flex items-center gap-3 font-medium transition-colors"><Icons.Pen size={18}/> 編輯景點</button>
+                                    <div className="h-px bg-slate-700 mx-4"></div>
+                                    <button onClick={() => { setTransferConfig({ place: activePlaceMenu, type: 'copy', sourceDayId: activePlaceMenu.sourceDayId }); setActivePlaceMenu(null); }} className="w-full text-left px-5 py-4 text-blue-400 hover:bg-slate-700 hover:text-blue-300 flex items-center gap-3 font-medium transition-colors"><Icons.Copy size={18}/> 複製到...</button>
+                                    <button onClick={() => { setTransferConfig({ place: activePlaceMenu, type: 'move', sourceDayId: activePlaceMenu.sourceDayId }); setActivePlaceMenu(null); }} className="w-full text-left px-5 py-4 text-amber-400 hover:bg-slate-700 hover:text-amber-300 flex items-center gap-3 font-medium transition-colors"><Icons.MoveRight size={18}/> 移動到...</button>
+                                    <div className="h-px bg-slate-700 mx-4"></div>
+                                    <button onClick={() => { setPlaceToDelete(activePlaceMenu.id); setActiveDayId(activePlaceMenu.sourceDayId); setActivePlaceMenu(null); }} className="w-full text-left px-5 py-4 text-red-400 hover:bg-slate-700 hover:text-red-300 flex items-center gap-3 font-medium transition-colors"><Icons.Trash2 size={18}/> 刪除景點</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {transferConfig && (
+                        <div className="fixed inset-0 bg-black/80 z-[250] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" onMouseDown={onBackdropDown} onMouseUp={(e) => onBackdropUp(e, () => setTransferConfig(null))}>
+                            <div className="bg-slate-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden border border-slate-700">
+                                <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50"><h3 className="font-bold text-lg text-slate-100 flex items-center gap-2">{transferConfig.type === 'copy' ? <Icons.Copy size={18} className="text-blue-400"/> : <Icons.MoveRight size={18} className="text-amber-400"/>}{transferConfig.type === 'copy' ? '複製' : '移動'}景點</h3><button onClick={() => setTransferConfig(null)}><Icons.X size={20} className="text-slate-500 hover:text-white" /></button></div>
+                                <div className="p-6 space-y-5">
+                                    <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700 flex items-center gap-3"><CategoryIconWithLabel type={transferConfig.place.type} size={16} /><span className="font-bold text-slate-200 truncate">{transferConfig.place.name}</span></div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-2">請選擇目標行程</label>
+                                        <select value={transferTargetTrip} onChange={(e) => { setTransferTargetTrip(e.target.value); setTransferTargetDay(''); }} className="w-full px-3 py-3 bg-slate-900 border border-slate-600 text-slate-100 rounded-xl outline-none focus:border-blue-500 font-medium">
+                                            <option value="" disabled>-- 選擇行程 --</option>
+                                            <option value="trip_global_library" className="text-amber-400 font-bold">📌 行程收藏庫</option>
+                                            {trips.filter(t => t.id !== 'trip_global_library').map(t => (
+                                                <option key={t.id} value={t.id}>{t.trip?.title || '未命名行程'} ({t.trip?.dates || '無日期'})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {transferTargetTrip && (
+                                        <div className="animate-fade-in">
+                                            <label className="block text-xs font-bold text-slate-400 mb-2">請選擇目標天數</label>
+                                            <select value={transferTargetDay} onChange={(e) => setTransferTargetDay(e.target.value)} className="w-full px-3 py-3 bg-slate-900 border border-slate-600 text-slate-100 rounded-xl outline-none focus:border-blue-500 font-medium">
+                                                <option value="" disabled>-- 選擇天數 --</option>
+                                                {trips.find(t => t.id === transferTargetTrip)?.trip?.days?.map((d, i) => (
+                                                    <option key={d.id} value={d.id}>第 {i+1} 天：{d.title} ({formatShortDate(d.date) || '無日期'})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <button onClick={handleTransferSubmit} disabled={!transferTargetTrip || !transferTargetDay} className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg transition-colors flex items-center justify-center gap-2 mt-4">
+                                        確認{transferConfig.type === 'copy' ? '複製' : '移動'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -2531,7 +2699,7 @@ useEffect(() => {
                     )}
                 </div>
             );
-        }
+        };
 
         function MainApp() {
             const [user, setUser] = useState(null);
@@ -2545,7 +2713,6 @@ useEffect(() => {
             
             const showMsg = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
             
-            // Modal 點擊防誤觸追蹤
             const [backdropTarget, setBackdropTarget] = useState(null);
             const onBackdropDown = (e) => setBackdropTarget(e.target);
             const onBackdropUp = (e, closeFn) => {
@@ -2590,6 +2757,20 @@ useEffect(() => {
             };
 
             const confirmDeleteTrip = async () => { if (tripToDelete) { await window.FirebaseSDK.deleteDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', tripToDelete)); setTripToDelete(null); showMsg("已刪除行程"); } };
+
+            const handleOpenLibrary = async () => {
+                const libId = 'trip_global_library';
+                const libExists = trips.find(t => t.id === libId);
+                // 首次開啟會自動建立這座收藏庫
+                if (!libExists) {
+                    await window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', libId), { 
+                        trip: { id: libId, title: '行程收藏庫', dates: '永久保存版', icon: '📌', days: [{id: 'lib_day_1', title: '我的最愛', date: getFutureDate(0), places: [], weather: { type: 'sun', minTemp: 20, maxTemp: 25, label: '晴天' }}] }, 
+                        members: [{ id: 'm1', name: '我', color: 'bg-amber-500', avatar: '👤' }], expenses: [], shoppingItems: [], packingList: [] 
+                    });
+                }
+                setActiveTripId(libId);
+                setCurrentView('planner');
+            };
             
             if (!user) return <div className="h-screen w-screen flex items-center justify-center bg-slate-900 text-blue-400 font-bold">同步連線中...</div>;
             
@@ -2601,13 +2782,13 @@ useEffect(() => {
                             onCreateTrip={async () => { 
                                 const nid = 'trip_' + Date.now(); 
                                 await window.FirebaseSDK.setDoc(window.FirebaseSDK.doc(db, 'artifacts', appId, 'public', 'data', 'trips', nid), { 
-                                    trip: { id: nid, title: '新行程', dates: getFutureDate(0), icon: '🚀', days: [{id: 1, title: 'Day 1', date: getFutureDate(0), places: [], weather: { type: 'sun', minTemp: 20, maxTemp: 25, label: '晴天' }}] }, 
+                                    trip: { id: nid, title: '新行程', dates: getFutureDate(0), icon: '🚀', days: [{id: 'day_1', title: 'Day 1', date: getFutureDate(0), places: [], weather: { type: 'sun', minTemp: 20, maxTemp: 25, label: '晴天' }}] }, 
                                     members: [{ id: 'm1', name: '我', color: 'bg-blue-500', avatar: '👤' }], expenses: [], shoppingItems: [], packingList: [] 
                                 }); setActiveTripId(nid); setCurrentView('planner'); 
                             }} 
-                            onSelectTrip={(id) => { setActiveTripId(id); setCurrentView('planner'); }} onDeleteTrip={(id) => setTripToDelete(id)} onImportTrip={handleImportTrip} onExportTrip={handleExportTrip} toast={toast} 
+                            onSelectTrip={(id) => { setActiveTripId(id); setCurrentView('planner'); }} onDeleteTrip={(id) => setTripToDelete(id)} onImportTrip={handleImportTrip} onExportTrip={handleExportTrip} onOpenLibrary={handleOpenLibrary} toast={toast} 
                         />
-                    ) : (<TripPlanner tripId={activeTripId} onBack={() => setCurrentView('dashboard')} db={db} appId={appId} user={user} />)}
+                    ) : (<TripPlanner tripId={activeTripId} trips={trips} onBack={() => setCurrentView('dashboard')} onOpenLibrary={handleOpenLibrary} db={db} appId={appId} user={user} />)}
                     
                     {tripToDelete && (
                         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-fade-in" onMouseDown={onBackdropDown} onMouseUp={(e) => onBackdropUp(e, () => setTripToDelete(null))}>
