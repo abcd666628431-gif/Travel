@@ -729,10 +729,75 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const [title, setTitle] = useState(day?.title || '');
             useEffect(() => { setTitle(day?.title || ''); }, [day?.title, day?.id]);
             const handleBlur = () => { const trimmed = title.trim(); if (!trimmed) { setTitle(day?.title || '新的一天'); } else if (trimmed !== day?.title) { onUpdate(day.id, trimmed); } };
+            const DayDateInput = React.memo(({ day, onUpdate }) => {
+            const formatDateForInput = (dateStr) => {
+                if (!dateStr) return "";
+                const cleanStr = dateStr.split(' ')[0]; // 取出 "2026/4/14"
+                const parts = cleanStr.split('/');
+                if (parts.length !== 3) return "";
+                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`; // 轉為 YYYY-MM-DD
+            };
+
+            const [dateVal, setDateVal] = useState(formatDateForInput(day?.date));
+
+            useEffect(() => { setDateVal(formatDateForInput(day?.date)); }, [day?.date, day?.id]);
+
+            const handleChange = (e) => {
+                const newVal = e.target.value;
+                if (!newVal) return;
+                setDateVal(newVal);
+                const d = new Date(newVal);
+                const mm = d.getMonth() + 1;
+                const dd = d.getDate();
+                const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+                onUpdate(day.id, `${d.getFullYear()}/${mm}/${dd} (${dayOfWeek})`);
+            };
+
+            return (
+                <input 
+                    type="date" 
+                    value={dateVal} 
+                    onChange={handleChange}
+                    className="text-[10px] md:text-xs text-slate-400 font-medium bg-transparent outline-none border border-transparent focus:border-blue-500/50 rounded cursor-pointer hover:bg-slate-800 transition-colors [color-scheme:dark]"
+                />
+            );
+        });
             const handleKeyDown = (e) => { if (e.key === 'Enter') e.target.blur(); };
             return (<input type="text" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleBlur} onKeyDown={handleKeyDown} className="font-bold text-blue-400 text-sm md:text-base bg-transparent outline-none w-full focus:bg-slate-900 focus:px-2 -ml-2 md:-ml-1 px-2 md:px-1 py-0.5 md:py-1 rounded transition-all border border-transparent focus:border-blue-500/50" placeholder="輸入天數名稱..." />);
         });
+const DayDateInput = React.memo(({ day, onUpdate }) => {
+            const formatDateForInput = (dateStr) => {
+                if (!dateStr) return "";
+                const cleanStr = dateStr.split(' ')[0]; 
+                const parts = cleanStr.split('/');
+                if (parts.length !== 3) return "";
+                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+            };
 
+            const [dateVal, setDateVal] = useState(formatDateForInput(day?.date));
+
+            useEffect(() => { setDateVal(formatDateForInput(day?.date)); }, [day?.date, day?.id]);
+
+            const handleChange = (e) => {
+                const newVal = e.target.value;
+                if (!newVal) return;
+                setDateVal(newVal);
+                const d = new Date(newVal);
+                const mm = d.getMonth() + 1;
+                const dd = d.getDate();
+                const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
+                onUpdate(day.id, `${d.getFullYear()}/${mm}/${dd} (${dayOfWeek})`);
+            };
+
+            return (
+                <input 
+                    type="date" 
+                    value={dateVal} 
+                    onChange={handleChange}
+                    className="text-[10px] md:text-xs text-slate-400 font-medium bg-transparent outline-none border border-transparent focus:border-blue-500/50 rounded cursor-pointer hover:bg-slate-800 transition-colors [color-scheme:dark]"
+                />
+            );
+        });
         const StayTimeInput = React.memo(({ value, onChange }) => {
             const valNum = parseFloat(value !== undefined && value !== '' ? value : 1);
             const h = isNaN(valNum) ? 0 : Math.floor(valNum);
@@ -1528,7 +1593,7 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const handleAddDay = () => { const newId = 'day_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5); const nextIndex = trip.days ? trip.days.length : 0; pushUpdate({ trip: { ...trip, days: [...(trip.days||[]), { id: newId, date: getFutureDate(nextIndex), title: `新的一天`, color: '#3b82f6', weather: { type: 'sun', minTemp: 20, maxTemp: 25, label: '晴天' }, places: [] }] } }); setActiveDayId(newId); };
 
             const handleUpdateDayTitle = (dayId, newTitle) => { const newDays = trip.days.map(d => d.id === dayId ? { ...d, title: newTitle } : d); pushUpdate({ trip: { ...trip, days: newDays } }); };
-
+const handleUpdateDayDate = (dayId, newDate) => { const newDays = trip.days.map(d => d.id === dayId ? { ...d, date: newDate } : d); pushUpdate({ trip: { ...trip, days: newDays } }); };
             const handleMemberAvatarUpload = (memberId, e) => {
                 const file = e.target.files[0]; if (!file) return; const reader = new FileReader();
                 reader.onload = async (event) => { 
@@ -1618,16 +1683,95 @@ return (
                         </div>
                     </header>
 
-                    <div className="flex border-b border-slate-800 bg-slate-900 px-2 md:px-4 gap-4 md:gap-6 text-sm font-medium overflow-x-auto no-scrollbar">
-                        <button onClick={() => setActiveTab('itinerary')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'itinerary' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.Map size={18} />行程</button>
-                        <button onClick={() => setActiveTab('expenses')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'expenses' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.Wallet size={18} />花費</button>
-                        <button onClick={() => setActiveTab('shopping')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'shopping' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.ShoppingBag size={18} />待買</button>
-                        <button onClick={() => setActiveTab('packing')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'packing' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.Briefcase size={18} />行李</button>
-                        <button onClick={() => setActiveTab('categories')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'categories' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.FileText size={18} />總覽</button>
-                    </div>
+                    {tripId !== 'trip_global_library' && (
+                        <div className="flex border-b border-slate-800 bg-slate-900 px-2 md:px-4 gap-4 md:gap-6 text-sm font-medium overflow-x-auto no-scrollbar">
+                            <button onClick={() => setActiveTab('itinerary')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'itinerary' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.Map size={18} />行程</button>
+                            <button onClick={() => setActiveTab('expenses')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'expenses' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.Wallet size={18} />花費</button>
+                            <button onClick={() => setActiveTab('shopping')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'shopping' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.ShoppingBag size={18} />待買</button>
+                            <button onClick={() => setActiveTab('packing')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'packing' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.Briefcase size={18} />行李</button>
+                            <button onClick={() => setActiveTab('categories')} className={`py-3 flex items-center gap-2 border-b-2 shrink-0 ${activeTab === 'categories' ? 'border-blue-500 text-blue-500' : 'border-transparent text-slate-500'}`}><Icons.FileText size={18} />總覽</button>
+                        </div>
+                    )}
                     
                     <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative bg-slate-950">
-                        <div className={`w-full flex-col md:flex-row h-full absolute inset-0 bg-slate-950 ${activeTab === 'itinerary' ? 'flex z-10 opacity-100 pointer-events-auto' : 'hidden z-0 opacity-0 pointer-events-none'}`}>
+                        
+                        {/* 🌟 行程收藏庫專屬排版 (總覽橫向卡片式，無時間與交通) 🌟 */}
+                        <div className={`w-full h-full absolute inset-0 bg-slate-900 overflow-y-auto p-4 md:p-8 ${activeTab === 'itinerary' && tripId === 'trip_global_library' ? 'block z-20 opacity-100 pointer-events-auto' : 'hidden z-0 opacity-0 pointer-events-none'}`}>
+                            <div className="max-w-[1600px] mx-auto space-y-6 pb-32">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-2xl font-bold text-amber-400 flex items-center gap-2"><Icons.Bookmark size={24} /> 行程收藏庫</h2>
+                                    <span className="bg-amber-500/20 text-amber-400 text-xs px-3 py-1.5 rounded-full font-bold border border-amber-500/30">共 {trip.days?.reduce((acc, day) => acc + (day.places?.length || 0), 0)} 個珍藏景點</span>
+                                </div>
+                                <div className="flex flex-nowrap gap-4 overflow-x-auto pb-8 items-start w-full styled-scrollbar">
+                                    {trip.days?.map((day, idx) => {
+                                        const places = day.places || [];
+                                        return (
+                                            <div key={day.id} className="w-[85vw] sm:w-[300px] md:w-[340px] shrink-0 flex flex-col animate-fade-in bg-slate-900/40 rounded-[2rem] border border-slate-800 p-3 md:p-4 shadow-lg h-max">
+                                                <div className="flex justify-between items-center bg-slate-800/80 p-3 rounded-xl mb-4 border border-slate-700 shadow-sm shrink-0">
+                                                    <div className="flex flex-col flex-1 mr-2">
+                                                        <DayTitleInput day={day} onUpdate={handleUpdateDayTitle} />
+                                                        <div className="text-[10px] text-slate-400 mt-1">{places.length} 個景點</div>
+                                                    </div>
+                                                    <button onClick={() => { setActiveDayId(day.id); setShowDeleteDayConfirm(true); }} className="p-1.5 text-slate-500 hover:text-red-400 bg-slate-800 rounded-lg border border-slate-700 transition-colors shrink-0"><Icons.Trash2 size={16} /></button>
+                                                </div>
+                                                <div className="flex flex-col relative min-h-[60px]">
+                                                    {places.length === 0 ? (
+                                                        <div onDragOver={(e) => { e.preventDefault(); setDragOverOverview({ dayId: day.id, index: 0 }); }} onDrop={(e) => { handleOverviewDrop(e, day.id, 0); setDragOverOverview(null); }} className={`h-24 flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors ${dragOverOverview?.dayId === day.id && dragOverOverview?.index === 0 ? 'border-amber-400 bg-amber-500/10 opacity-100' : 'border-slate-700 text-slate-500'}`}>
+                                                            <Icons.MapPin size={24} className={`mb-2 ${dragOverOverview?.dayId === day.id && dragOverOverview?.index === 0 ? 'text-amber-400' : 'opacity-50'}`} />
+                                                            <span className={`text-xs font-bold ${dragOverOverview?.dayId === day.id && dragOverOverview?.index === 0 ? 'text-amber-400' : ''}`}>拖放至此</span>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            {places.map((p, i) => {
+                                                                const draggedIdxInList = draggedOverviewPlace?.dayId === day.id ? draggedOverviewPlace.placeIndex : -1;
+                                                                const isDraggingDown = draggedIdxInList !== -1 && draggedIdxInList < i;
+                                                                const isDraggingUp = draggedIdxInList === -1 || draggedIdxInList > i;
+                                                                const placeImg = images[`place_${p.id}`]; 
+                                                                return (
+                                                                    <div key={p.id} onDragOver={(e) => { e.preventDefault(); setDragOverOverview({ dayId: day.id, index: i }); }} onDrop={(e) => { handleOverviewDrop(e, day.id, i); setDragOverOverview(null); }} className="flex flex-col">
+                                                                        {dragOverOverview?.dayId === day.id && dragOverOverview?.index === i && isDraggingUp && draggedOverviewPlace?.place?.id !== p.id && (<div className="w-full h-20 bg-amber-500/10 border-2 border-dashed border-amber-400 rounded-xl mb-3 pointer-events-none flex items-center justify-center animate-fade-in shadow-inner"><span className="text-amber-400 font-bold text-xs bg-amber-900/40 px-3 py-1 rounded-full">拖放至此</span></div>)}
+                                                                        <div draggable={true} onDragStart={(e) => handleOverviewDragStart(e, day.id, i, p)} onDragEnd={handleOverviewDragEnd} className={`flex flex-col group/card transition-all duration-200 mb-3 ${draggedOverviewPlace?.place?.id === p.id ? 'opacity-30 scale-[0.98]' : 'hover:opacity-90'}`}>
+                                                                            <div className="flex items-stretch overflow-hidden rounded-xl border border-slate-700 bg-slate-800 transition-all group-hover/card:border-amber-500 shadow-md min-h-[90px]">
+                                                                                <div className="w-[80px] sm:w-[90px] bg-slate-700/50 shrink-0 relative overflow-hidden flex items-center justify-center" onClick={() => placeImg && setPreviewImage(placeImg)}>{placeImg ? (<img src={placeImg} draggable={false} className="absolute inset-0 w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-500 cursor-pointer" />) : (<div className="pointer-events-none opacity-50 relative z-10"><CategoryIconWithLabel type={p.type} size={20} /></div>)}</div>
+                                                                                <div className="flex-1 min-w-0 relative p-3 flex flex-col justify-between">
+                                                                                    <div className="flex justify-between items-start gap-1">
+                                                                                        <div className="flex flex-col min-w-0">
+                                                                                            <h3 className="font-bold text-slate-100 text-sm leading-snug">{p.name}</h3>
+                                                                                            {p.note && (<div className="text-xs text-slate-400 line-clamp-2 mt-1">{p.note}</div>)}
+                                                                                        </div>
+                                                                                        <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                                                                                            <div onPointerDown={() => setDragEnabledOverviewId(p.id)} onTouchStart={() => setDragEnabledOverviewId(p.id)} className="drag-handle p-1.5 text-slate-500 hover:text-white hover:bg-slate-700 rounded-md cursor-grab active:cursor-grabbing transition-colors shrink-0"><Icons.GripVertical size={16} /></div>
+                                                                                            <button onClick={(e) => { e.stopPropagation(); setActivePlaceMenu({...p, sourceDayId: day.id, image: placeImg}); }} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="選項"><Icons.MoreVertical size={16} /></button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-1.5 mt-2 justify-between">
+                                                                                        <span className="px-2 py-0.5 rounded text-[10px] text-slate-300 bg-slate-700 font-bold uppercase tracking-wider">{getCategoryName(p.type)}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        {dragOverOverview?.dayId === day.id && dragOverOverview?.index === i && isDraggingDown && draggedOverviewPlace?.place?.id !== p.id && (<div className="w-full h-20 bg-amber-500/10 border-2 border-dashed border-amber-400 rounded-xl mb-3 pointer-events-none flex items-center justify-center animate-fade-in shadow-inner"><span className="text-amber-400 font-bold text-xs bg-amber-900/40 px-3 py-1 rounded-full">拖放至此</span></div>)}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </>
+                                                    )}
+                                                    <div onDragOver={(e) => { e.preventDefault(); setDragOverOverview({ dayId: day.id, index: places.length }); }} onDrop={(e) => { handleOverviewDrop(e, day.id, places.length); setDragOverOverview(null); }} className={`w-full rounded-xl border-2 border-dashed transition-all flex items-center justify-center ${dragOverOverview?.dayId === day.id && dragOverOverview?.index === places.length ? 'h-16 mt-0 border-amber-400 bg-amber-500/10 opacity-100' : (draggedOverviewPlace ? 'h-10 mt-0 border-transparent opacity-0' : 'h-0 m-0 border-transparent opacity-0 pointer-events-none overflow-hidden')}`}><span className="text-xs font-bold text-amber-400 bg-amber-900/40 px-3 py-1 rounded-full">移至尾端</span></div>
+                                                </div>
+                                                <button onClick={() => { setShowEditPlaceModal(true); setActiveDayId(day.id); setNewItem({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null }); setModalMode('add'); }} className="w-full py-3 mt-1 border-2 border-dashed border-slate-700/50 rounded-xl text-slate-500 font-bold hover:border-amber-500 hover:text-amber-400 hover:bg-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"><Icons.Plus size={16} /> 新增珍藏景點</button>
+                                            </div>
+                                        );
+                                    })}
+                                    <button onClick={() => handleAddDay()} className="w-[60px] md:w-[80px] shrink-0 h-[200px] rounded-[2rem] border-2 border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors flex flex-col items-center justify-center gap-2 bg-slate-900/20 hover:bg-slate-800/40">
+                                        <Icons.Plus size={24} />
+                                        <span className="text-xs font-bold" style={{writingMode: 'vertical-rl'}}>新增分類</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 原本的一般行程排版 (地圖 + 垂直列表) */}
+                        <div className={`w-full flex-col md:flex-row h-full absolute inset-0 bg-slate-950 ${activeTab === 'itinerary' && tripId !== 'trip_global_library' ? 'flex z-10 opacity-100 pointer-events-auto' : 'hidden z-0 opacity-0 pointer-events-none'}`}>
                             <div className="w-full h-[40vh] md:h-full md:flex-1 relative order-1 md:order-2 shrink-0 z-0 border-b md:border-b-0 md:border-l border-slate-800 shadow-md md:shadow-none">
                                 <RealMap places={activeDayData?.places || []} hoveredId={hoveredPlaceId} hoveredSegmentId={hoveredSegmentId} zoomControlKey={activeDayId} dayColor={activeDayData?.color} onRouteAltSelect={(pId, altIdx) => handleUpdateRouteIndex(activeDayData.id, pId, altIdx)} tempMarker={tempMarker} isActive={activeTab === 'itinerary'} />
                             </div>
@@ -1648,7 +1792,7 @@ return (
                                         </div>
                                         
                                         <div className="itinerary-list-container px-3 md:px-4 py-4 overflow-y-auto flex-1 pb-32">
-                                            <div className="flex justify-between items-center bg-slate-800/50 p-2.5 md:p-3 rounded-xl mb-3 md:mb-4 border border-slate-700/50"><div className="flex flex-col flex-1 min-w-0 mr-2"><DayTitleInput day={activeDayData} onUpdate={handleUpdateDayTitle} /><div className="text-[10px] text-slate-400 mt-0.5 md:mt-1 px-2 md:px-1">{activeDayData?.places?.length || 0} 個景點</div></div><button onClick={() => setShowDeleteDayConfirm(true)} className="p-1.5 md:p-2 text-slate-500 hover:text-red-400 bg-slate-800 rounded-lg border border-slate-700 transition-colors shrink-0"><Icons.Trash2 size={16} className="scale-90 md:scale-100" /></button></div>
+                                            <div className="flex justify-between items-center bg-slate-800/50 p-2.5 md:p-3 rounded-xl mb-3 md:mb-4 border border-slate-700/50"><div className="flex flex-col flex-1 min-w-0 mr-2"><DayTitleInput day={activeDayData} onUpdate={handleUpdateDayTitle} /><div className="flex items-center gap-2 mt-0.5 md:mt-1 px-2 md:px-1"><DayDateInput day={activeDayData} onUpdate={handleUpdateDayDate} /><span className="text-[10px] text-slate-500">· {activeDayData?.places?.length || 0} 個景點</span></div></div><button onClick={() => setShowDeleteDayConfirm(true)} className="p-1.5 md:p-2 text-slate-500 hover:text-red-400 bg-slate-800 rounded-lg border border-slate-700 transition-colors shrink-0"><Icons.Trash2 size={16} className="scale-90 md:scale-100" /></button></div>
                                             <div className="flex flex-col mt-2">
                                                 {activeDayData?.places.map((p, i) => {
                                                     const isNoteExpanded = expandedNotes[p.id];
