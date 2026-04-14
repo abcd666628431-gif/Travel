@@ -729,39 +729,6 @@ const MemberNameInput = React.memo(({ member, onUpdate }) => {
             const [title, setTitle] = useState(day?.title || '');
             useEffect(() => { setTitle(day?.title || ''); }, [day?.title, day?.id]);
             const handleBlur = () => { const trimmed = title.trim(); if (!trimmed) { setTitle(day?.title || '新的一天'); } else if (trimmed !== day?.title) { onUpdate(day.id, trimmed); } };
-            const DayDateInput = React.memo(({ day, onUpdate }) => {
-            const formatDateForInput = (dateStr) => {
-                if (!dateStr) return "";
-                const cleanStr = dateStr.split(' ')[0]; // 取出 "2026/4/14"
-                const parts = cleanStr.split('/');
-                if (parts.length !== 3) return "";
-                return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`; // 轉為 YYYY-MM-DD
-            };
-
-            const [dateVal, setDateVal] = useState(formatDateForInput(day?.date));
-
-            useEffect(() => { setDateVal(formatDateForInput(day?.date)); }, [day?.date, day?.id]);
-
-            const handleChange = (e) => {
-                const newVal = e.target.value;
-                if (!newVal) return;
-                setDateVal(newVal);
-                const d = new Date(newVal);
-                const mm = d.getMonth() + 1;
-                const dd = d.getDate();
-                const dayOfWeek = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()];
-                onUpdate(day.id, `${d.getFullYear()}/${mm}/${dd} (${dayOfWeek})`);
-            };
-
-            return (
-                <input 
-                    type="date" 
-                    value={dateVal} 
-                    onChange={handleChange}
-                    className="text-[10px] md:text-xs text-slate-400 font-medium bg-transparent outline-none border border-transparent focus:border-blue-500/50 rounded cursor-pointer hover:bg-slate-800 transition-colors [color-scheme:dark]"
-                />
-            );
-        });
             const handleKeyDown = (e) => { if (e.key === 'Enter') e.target.blur(); };
             return (<input type="text" value={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleBlur} onKeyDown={handleKeyDown} className="font-bold text-blue-400 text-sm md:text-base bg-transparent outline-none w-full focus:bg-slate-900 focus:px-2 -ml-2 md:-ml-1 px-2 md:px-1 py-0.5 md:py-1 rounded transition-all border border-transparent focus:border-blue-500/50" placeholder="輸入天數名稱..." />);
         });
@@ -827,7 +794,31 @@ const DayDateInput = React.memo(({ day, onUpdate }) => {
                 </div>
             );
         });
+const TripHeaderInput = React.memo(({ value, field, trip, pushUpdate, className, placeholder, maxLength }) => {
+            const [localVal, setLocalVal] = useState(value || '');
+            useEffect(() => { setLocalVal(value || ''); }, [value]);
 
+            const handleBlur = () => {
+                if (localVal !== (value || '')) {
+                    pushUpdate({ trip: { ...trip, [field]: localVal } });
+                }
+            };
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter') e.target.blur();
+            };
+
+            return (
+                <input
+                    value={localVal}
+                    onChange={(e) => setLocalVal(e.target.value)}
+                    onBlur={handleBlur}
+                    onKeyDown={handleKeyDown}
+                    className={className}
+                    placeholder={placeholder}
+                    maxLength={maxLength}
+                />
+            );
+        });
         const TripPlanner = ({ tripId, trips, onBack, onOpenLibrary, db, appId, user, isLibraryModal }) => {
             const [trip, setTrip] = useState({ title: '', dates: '', days: [] });
             const [members, setMembers] = useState([]);
@@ -837,13 +828,23 @@ const DayDateInput = React.memo(({ day, onUpdate }) => {
             const [images, setImages] = useState({});
             const AMAP_KEY = '3bf27a17038b433640ab774dafa1d0a6'; 
             
-           const [activeTab, setActiveTab] = useState('itinerary'); 
+           // 🌟 改為從 localStorage 讀取最後停留的「頁籤」(花費、待買等)
+            const [activeTab, setActiveTab] = useState(() => localStorage.getItem('icarus_activeTab') || 'itinerary'); 
             const [activeDayId, setActiveDayId] = useState(1);
             const [panelMode, setPanelMode] = useState('list'); 
 
-            // 🌟 修復 1：當切換行程 (或進入收藏庫) 時，強制切換回「行程」頁籤
+            // 當頁籤改變時，隨時自動存檔到瀏覽器記憶中
             useEffect(() => {
-                setActiveTab('itinerary');
+                localStorage.setItem('icarus_activeTab', activeTab);
+            }, [activeTab]);
+
+            // 🌟 更聰明的防呆：確保只有在「真的切換到另一個行程」時才重置為行程頁籤，F5 刷新時保持原樣
+            const prevTripIdRef = useRef(tripId);
+            useEffect(() => {
+                if (prevTripIdRef.current !== tripId) {
+                    setActiveTab('itinerary');
+                    prevTripIdRef.current = tripId;
+                }
             }, [tripId]);
             const [modalMode, setModalMode] = useState('add'); 
             const [newItem, setNewItem] = useState({ id: '', name: '', time: '12:00', type: 'sight', address: '', note: '', stayTime: '1', image: null });
@@ -1680,13 +1681,15 @@ return (
                   <header className="h-14 border-b border-slate-800 flex items-center justify-between px-3 md:px-4 bg-slate-900 shrink-0 z-20 shadow-lg">
                         <div className="flex items-center gap-3 flex-1">
                             <button onClick={onBack} className="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-300 shrink-0"><Icons.ArrowLeft size={20} /></button>
-                            <div className={`w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold hover:scale-105 transition-transform shrink-0`}><input value={trip.icon || '🚀'} onChange={e => pushUpdate({trip:{...trip, icon:e.target.value}})} className="w-full h-full bg-transparent text-center text-lg outline-none cursor-pointer" maxLength="2"/></div>
+                            <div className={`w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold hover:scale-105 transition-transform shrink-0`}>
+                                <TripHeaderInput value={trip.icon || '🚀'} field="icon" trip={trip} pushUpdate={pushUpdate} className="w-full h-full bg-transparent text-center text-lg outline-none cursor-pointer" maxLength="2" />
+                            </div>
                             <div className="flex flex-col min-w-0 flex-1 flex-wrap">
                                 <div className="flex items-center gap-2">
-                                    <input value={trip.title} onChange={(e) => pushUpdate({trip:{...trip, title:e.target.value}})} className="text-sm font-bold bg-transparent outline-none flex-1 min-w-[100px]" />
+                                    <TripHeaderInput value={trip.title} field="title" trip={trip} pushUpdate={pushUpdate} className="text-sm font-bold bg-transparent outline-none flex-1 min-w-[100px]" placeholder="輸入行程名稱" />
                                     {tripId === 'trip_global_library' && <span className="bg-amber-500/20 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-500/30 whitespace-nowrap shrink-0">行程收藏庫</span>}
                                 </div>
-                                <input value={trip.dates} onChange={(e) => pushUpdate({trip:{...trip, dates:e.target.value}})} className="text-xs text-slate-500 bg-transparent outline-none w-full mt-0.5" />
+                                <TripHeaderInput value={trip.dates} field="dates" trip={trip} pushUpdate={pushUpdate} className="text-xs text-slate-500 bg-transparent outline-none w-full mt-0.5" placeholder="輸入日期 (例如: 2026/04/01 - 04/05)" />
                             </div>
                         </div>
                         <div className="flex items-center gap-2 md:gap-3 shrink-0 ml-2">
@@ -1955,7 +1958,7 @@ return (
                                 )}
                             </div>
                         </div>
-{activeTab === 'expenses' && (
+{activeTab === 'expenses' && tripId !== 'trip_global_library' && (
                             <div className="w-full h-full bg-slate-900 p-4 md:p-8 overflow-y-auto relative z-20">
                                 <div className="max-w-[1400px] mx-auto space-y-6 pb-32">
                                     <div className="flex justify-between items-center mb-2"><h2 className="text-2xl font-bold text-slate-100">花費紀錄</h2><div className="flex gap-2"><button onClick={() => setShowExpenseDetails(true)} className="bg-slate-800 hover:bg-slate-700 text-teal-400 px-4 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2 border border-slate-700"><Icons.FileText size={18} /> <span className="hidden sm:inline">明細</span></button><button onClick={() => setShowSettlementPlan(true)} className="bg-slate-800 hover:bg-slate-700 text-blue-400 px-4 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2 border border-slate-700"><Icons.Calculator size={18} /> <span className="hidden sm:inline">結算方案</span></button><button onClick={() => { const defaultDate = activeDayData?.date ? activeDayData.date.split(' ')[0].replace(/\//g, '-') : '2026-04-03'; setNewExpenseItem({id: undefined, date: defaultDate, title: '', category: 'food', payer: members[0]?.name || '', amount: '', currency: displayCurrency, sharedBy: members.map(m => m.name), images: []}); setShowExpenseModal(true); }} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2"><Icons.Plus size={18} /> 新增</button></div></div>
@@ -2142,7 +2145,7 @@ const collectAmount = item.splitMode === 'custom' ? (convertedDisplayAmt - (paye
                             </div>
                         )}
                         
-                        {activeTab === 'shopping' && (
+                        {activeTab === 'shopping' && tripId !== 'trip_global_library' && (
                             <div className="w-full h-full bg-slate-900 p-4 md:p-8 overflow-y-auto relative z-20">
                                 <div className="max-w-[1400px] mx-auto space-y-6 pb-32">
                                     <div className="flex justify-between items-center mb-2"><h2 className="text-2xl font-bold text-slate-100">待買清單</h2><button onClick={() => { setNewShoppingItem({ id: undefined, name: '', qty: 1, price: 0, currency: displayCurrency, requester: members[0]?.name || '', note: '', image: null }); setShowShoppingModal(true); }} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2"><Icons.Plus size={18} /> 新增</button></div>
@@ -2192,7 +2195,7 @@ const collectAmount = item.splitMode === 'custom' ? (convertedDisplayAmt - (paye
                             </div>
                         )}
                         
-                        {activeTab === 'packing' && (
+                        {activeTab === 'packing' && tripId !== 'trip_global_library' && (
                             <div className="w-full h-full bg-slate-900 p-4 md:p-8 overflow-y-auto relative z-20">
                                 <div className="max-w-[1400px] mx-auto space-y-6 pb-32">
                                     <div className="flex justify-between items-center mb-2"><h2 className="text-2xl font-bold text-slate-100">行李清單</h2><button onClick={() => { setNewPackingItem({ text: '', owner: packingFilter !== 'all' ? packingFilter : 'all' }); setShowPackingModal(true); }} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2"><Icons.Plus size={18} /> 新增</button></div>
@@ -2258,7 +2261,7 @@ const collectAmount = item.splitMode === 'custom' ? (convertedDisplayAmt - (paye
                             </div>
                         )}
                         
-                        {activeTab === 'categories' && (
+                        {activeTab === 'categories' && tripId !== 'trip_global_library' && (
                             <div className="w-full h-full bg-slate-900 p-4 md:p-8 overflow-y-auto relative z-20">
                                 <div className="max-w-[1600px] mx-auto space-y-8 pb-32">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -2972,9 +2975,22 @@ const collectAmount = item.splitMode === 'custom' ? (convertedDisplayAmt - (paye
 
         function MainApp() {
             const [user, setUser] = useState(null);
-            const [currentView, setCurrentView] = useState('dashboard');
-            const [activeTripId, setActiveTripId] = useState(null);
+            
+            // 🌟 1. 改為優先從 localStorage 讀取最後的畫面與行程 ID
+            const [currentView, setCurrentView] = useState(() => localStorage.getItem('icarus_currentView') || 'dashboard');
+            const [activeTripId, setActiveTripId] = useState(() => localStorage.getItem('icarus_activeTripId') || null);
             const [trips, setTrips] = useState([]);
+
+            // 🌟 2. 新增一個監聽器：當畫面或行程切換時，自動存檔到瀏覽器中
+            useEffect(() => {
+                localStorage.setItem('icarus_currentView', currentView);
+                // 如果回到首頁，就清除行程紀錄；如果在行程內，就記住行程 ID
+                if (currentView === 'dashboard') {
+                    localStorage.removeItem('icarus_activeTripId');
+                } else if (activeTripId) {
+                    localStorage.setItem('icarus_activeTripId', activeTripId);
+                }
+            }, [currentView, activeTripId]);
             const [toast, setToast] = useState(null);
             const [tripToDelete, setTripToDelete] = useState(null);
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'shared-trip-v1';
